@@ -2,15 +2,11 @@ package de.tub.dima.impro3.lda;
 
 
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.math.DenseVector;
-import org.apache.flink.types.LongValue;
-import org.apache.flink.types.Pair;
-import org.apache.flink.util.Collector;
 
 
 /**
@@ -18,9 +14,7 @@ import org.apache.flink.util.Collector;
  */
 
 
-
 public class LDA_Job {
-
 
 
     public static void main(String[] args) throws Exception {
@@ -32,11 +26,25 @@ public class LDA_Job {
         /**
          * TODO: set uniques ids in different way
          */
+        //corpus.print();
 
         DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(1);
 
+        /**
+         * Default parameters:
+         *
+         *  S 1 4 16 64 256 1024 4096 16384     - mini batch size
+            κ 0.9 0.9 0.8 0.7 0.6 0.5 0.5 0.5   - learning rate
+            τ0 1024 1024 1024 1024 1024 1024 64 1 - early iterations
+         *
+         *
+         */
 
-        corpus.print();
+        int numberOfTopics = 3;
+
+
+        LDAModel ldaModel = new LDA().setK(numberOfTopics).run(corpus);
+
 
 
 
@@ -46,19 +54,18 @@ public class LDA_Job {
 
 
     /**
-     *  Map parser to split lines into vectors with unique ids
+     * Map parser to split lines into vectors with unique ids
      */
     public static class DataParser implements MapFunction<Tuple1<String>, Tuple2<Long, DenseVector>> {
 
         private Long id;
 
-        public DataParser(){
+        public DataParser() {
             this.id = (long) -1;
         }
 
         @Override
         public Tuple2<Long,DenseVector> map(Tuple1<String> s){
-
             id++;
             String[] sarray = s.f0.trim().split("\\s");
             double[] lineValues = new double[sarray.length];
@@ -66,11 +73,9 @@ public class LDA_Job {
             for(int i = 0; i < sarray.length; i++){
                 lineValues[i] = Double.parseDouble(sarray[i]);
             }
-            return new Tuple2<Long, DenseVector>(id, new DenseVector(lineValues));
+            return new Tuple2<>(id, new DenseVector(lineValues));
         }
     }
-
-
 
 
 }
