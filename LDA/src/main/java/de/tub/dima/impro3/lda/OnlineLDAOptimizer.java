@@ -7,6 +7,7 @@ package de.tub.dima.impro3.lda;
 import breeze.stats.distributions.Gamma;
 import breeze.stats.distributions.RandBasis;
 import org.apache.commons.math3.random.MersenneTwister;
+import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -15,6 +16,7 @@ import org.apache.flink.ml.math.DenseVector;
 import org.apache.flink.util.Collector;
 import scala.reflect.ClassTag;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -39,7 +41,7 @@ public class OnlineLDAOptimizer {
 
     private DataSet<Tuple2<Long, DenseVector>> docs;
 
-    private LDAModel model;
+    private de.tub.dima.impro3.lda.LDAModel model;
     private int iteration;
 
     /**
@@ -183,9 +185,22 @@ public class OnlineLDAOptimizer {
         this.iteration += 1;
         int vocabSize = this.vocabSize;
 
+        try {
+
+            int batchD = (int) batch.count();
+            this.gamma = getGammaMatrix(K, batchD);
+
+        }catch(Exception ex){
+            ex.printStackTrace();
+        }
+
 
         DenseMatrix eLogTheta =   LDAUtils.dirichletExpectation(this.gamma);
         DenseMatrix expElogbeta = LDAUtils.exp(eLogTheta);
+
+
+
+
 
         double alpha = this.alpha;
         //variational parameter over documents x topics
@@ -194,7 +209,7 @@ public class OnlineLDAOptimizer {
 
 
 
-        DataSet<Tuple2<DenseMatrix, List<DenseVector>>> stats = batch.mapPartition(new batchMapper());
+        DataSet<Tuple2<DenseMatrix, List<DenseVector>>> stats = batch.filter(new docFilter()).mapPartition(new batchMapper(K, vocabSize));
 
 
 
@@ -204,11 +219,48 @@ public class OnlineLDAOptimizer {
     public static class batchMapper extends RichMapPartitionFunction<Tuple2<Long, DenseVector>, Tuple2<DenseMatrix, List<DenseVector>>> {
 
 
+        private int k;
+        int vocabSize;
+
+        //int[] ids = wordIds[d];
+        // if(ids.length==0){
+        // continue;
+        //}
+
+        //DenseVector cts = new DenseVector(wordCts[d]);
+        //Topic proportions
+        //   DenseVector gammaD = gamma.getRow(d);
+
+        public batchMapper(int k, int vocabSize){
+            this.k = k;
+            this.vocabSize = vocabSize;
+        }
+
+        DenseMatrix stat = DenseMatrix.zeros(k, vocabSize);
+        List<DenseVector> gammaPart = new ArrayList<>();
+
+
+
+
+
+
 
         @Override
         public void mapPartition(Iterable<Tuple2<Long, DenseVector>> iterable, Collector<Tuple2<DenseMatrix, List<DenseVector>>> collector) throws Exception {
 
         }
+    }
+
+
+    public static class docFilter implements FilterFunction<Tuple2<Long, DenseVector>> {
+
+
+        @Override
+        public boolean filter(Tuple2<Long, DenseVector> doc) throws Exception {
+            return doc.f1.magnitude() != 0.0;
+        }
+
+
     }
 
 

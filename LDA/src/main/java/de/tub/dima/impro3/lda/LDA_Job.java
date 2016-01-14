@@ -18,6 +18,7 @@ public class LDA_Job {
 
 
     public static void main(String[] args) throws Exception {
+
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
         String path = "src/main/resources/data.txt";
