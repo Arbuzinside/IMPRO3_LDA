@@ -6,17 +6,21 @@ package de.tub.dima.impro3.lda;
 
 import breeze.stats.distributions.Gamma;
 import breeze.stats.distributions.RandBasis;
+import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.math.DenseMatrix;
 import org.apache.flink.ml.math.DenseVector;
+import org.apache.flink.ml.math.Vector;
 import org.apache.flink.util.Collector;
 import scala.reflect.ClassTag;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -27,7 +31,7 @@ public class OnlineLDAOptimizer {
     public final static double MEAN_CHANGE_THRESHOLD = 1e-5;
     public final static int NUM_ITERATIONS = 200;
 
-    private Random randomGenerator;
+    private static Random randomGenerator;
 
     /**
      * Common variables
@@ -136,7 +140,7 @@ public class OnlineLDAOptimizer {
             // Initialize the variational distribution q(beta|lambda)
             this.lambda = getGammaMatrix(vocabSize, K);
             this.iteration = 0;
-            this.randomGenerator = new Random(lda.getSeed());
+            randomGenerator = new Random(lda.getSeed());
 
         } catch (Exception ex){
             ex.printStackTrace();
@@ -207,29 +211,23 @@ public class OnlineLDAOptimizer {
         //parameters over documents x topics
         double gammaShape = this.gammaShape;
 
+        DataSet<Tuple2<Long, DenseVector>> filteredDocs = batch.filter(new docFilter());
 
+        DataSet<Tuple2<Long, Tuple2<Long, DenseVector>>> localBatchIndex =  filteredDocs.map(new batchIndex()).setParallelism(1);
 
-        DataSet<Tuple2<DenseMatrix, List<DenseVector>>> stats = batch.filter(new docFilter()).mapPartition(new batchMapper(K, vocabSize));
+        DataSet<Tuple2<DenseMatrix, List<DenseVector>>> stats = localBatchIndex.mapPartition(new batchMapper(K, vocabSize));
+
 
 
 
         return this;
     }
 
-    public static class batchMapper extends RichMapPartitionFunction<Tuple2<Long, DenseVector>, Tuple2<DenseMatrix, List<DenseVector>>> {
+    public static class batchMapper extends RichMapPartitionFunction<Tuple2<Long, Tuple2<Long, DenseVector>>, Tuple2<DenseMatrix, List<DenseVector>>> {
 
 
         private int k;
         int vocabSize;
-
-        //int[] ids = wordIds[d];
-        // if(ids.length==0){
-        // continue;
-        //}
-
-        //DenseVector cts = new DenseVector(wordCts[d]);
-        //Topic proportions
-        //   DenseVector gammaD = gamma.getRow(d);
 
         public batchMapper(int k, int vocabSize){
             this.k = k;
@@ -241,15 +239,38 @@ public class OnlineLDAOptimizer {
 
 
 
-
-
-
-
         @Override
-        public void mapPartition(Iterable<Tuple2<Long, DenseVector>> iterable, Collector<Tuple2<DenseMatrix, List<DenseVector>>> collector) throws Exception {
+        public void mapPartition(Iterable<Tuple2<Long, Tuple2<Long, DenseVector>>> docs, Collector<Tuple2<DenseMatrix, List<DenseVector>>> collector) throws Exception {
+
+
+            List<Double> vector;
+
+            int[][] ids;
+            int[][] cts;
+
+
+            while(docs.iterator().hasNext()) {
+                Tuple2<Long, DenseVector> doc = docs.iterator().next().f1;
+                DenseVector termCounts = doc.f1;
+
+                if (termCounts != null)
+                    vector  = new ArrayList(Arrays.asList(termCounts.data()));
+
+                //TODO: continue here
+                Tuple2<DenseVector, DenseMatrix> result = variationalTopicInference();
+
+
+
+
+            }
+
+
 
         }
     }
+
+
+
 
 
     public static class docFilter implements FilterFunction<Tuple2<Long, DenseVector>> {
@@ -260,9 +281,97 @@ public class OnlineLDAOptimizer {
             return doc.f1.magnitude() != 0.0;
         }
 
+    }
 
+    public static class batchIndex implements MapFunction<Tuple2<Long, DenseVector>, Tuple2<Long, Tuple2<Long,DenseVector>>> {
+
+        private Long id;
+
+        public batchIndex() {
+            this.id = (long) -1;
+        }
+
+        @Override
+        public Tuple2<Long,Tuple2<Long, DenseVector>> map(Tuple2<Long, DenseVector> batchDoc){
+            id++;
+            return new Tuple2<>(id, batchDoc);
+        }
     }
 
 
+
+    public static Tuple2<DenseVector, DenseMatrix> variationalTopicInference(DenseVector termCounts, DenseMatrix expElogbeta, double alpha,
+                                                                             double gammaShape, Integer K){
+
+        Tuple2<List<Integer>, double[]> IdCounts;
+
+        //TODO: check what is list
+        List<Integer> vector = new ArrayList<>(termCounts.size());
+
+
+        IdCounts = new Tuple2<>(vector, termCounts.data());
+
+
+        List<Integer> ids = IdCounts.f0;
+        double[] cts = IdCounts.f1;
+
+
+        if(ids != null && cts != null) {
+
+
+            //TODO: check random function
+            RandBasis randBasis = new RandBasis(new MersenneTwister(randomGenerator.nextLong()));
+            ClassTag<Double> tag = scala.reflect.ClassTag$.MODULE$.apply(Double.class);
+
+            DenseVector gammaD =  new DenseVector(new Gamma(gammaShape, 1.0 / gammaShape, randBasis).samplesVector(K, tag).data$mcD$sp());
+
+
+            DenseVector expElogthetaD = LDAUtils.exp(LDAUtils.dirichletExpectation(gammaD));
+            DenseMatrix expElogbetaD = LDAUtils.extractColumns(expElogbeta, ids);
+            DenseVector phiNorm = LDAUtils.dot(expElogthetaD.data(), LDAUtils.vectorToMatrix(expElogbetaD.data(),expElogbetaD.numRows(),expElogbetaD.numCols()));
+            phiNorm = LDAUtils.addToVector(phiNorm, 1.0E-100D);
+
+            DenseVector lastGamma;
+
+
+            // Iterate between gamma and phi until convergence
+            for (int it=0; it < NUM_ITERATIONS; ++it) {
+
+                lastGamma = gammaD.copy();
+
+                DenseVector temp = LDAUtils.divideVectors(new DenseVector(cts), phiNorm);
+                DenseVector v1 = LDAUtils.dot(temp.data(), LDAUtils.transpose(expElogbetaD));
+                DenseVector v2 = LDAUtils.product(expElogthetaD, v1);
+
+                gammaD = LDAUtils.addToVector(v2, alpha);
+
+                expElogthetaD = LDAUtils.exp(LDAUtils.dirichletExpectation(gammaD));
+
+
+                phiNorm = LDAUtils.dot(expElogthetaD.data(), LDAUtils.vectorToMatrix(expElogbetaD.data(),expElogbetaD.numRows(),expElogbetaD.numCols()));
+                phiNorm = LDAUtils.addToVector(phiNorm, 1.0E-100D);
+
+                if (LDAUtils.closeTo(gammaD,lastGamma, MEAN_CHANGE_THRESHOLD*K))
+                    break;
+            }
+
+            //TODO continue here
+
+
+
+
+        }
+
+
+
+
+
+
+
+
+
+
+        return new Tuple2<>();
+    }
 
 }

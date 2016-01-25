@@ -3,7 +3,6 @@ package de.tub.dima.impro3.lda;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.math.DenseVector;
-import org.apache.flink.ml.math.Vector;
 
 import java.util.Random;
 
@@ -17,7 +16,7 @@ public class LDA {
     private Integer maxIterations;
     private Double alpha;
     private Double beta;
-    private OnlineLDAOptimizer ldaOptimizer;
+    private de.tub.dima.impro3.lda.OnlineLDAOptimizer ldaOptimizer;
     private long seed;
 
 
