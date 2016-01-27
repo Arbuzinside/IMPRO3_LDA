@@ -7,6 +7,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.math.DenseVector;
+import org.apache.flink.ml.math.Matrix;
 
 
 /**
@@ -46,6 +47,17 @@ public class LDA_Job {
 
         LDAModel ldaModel = new LDA().setK(numberOfTopics).run(corpus);
 
+        // Output topics. Each is a distribution over words (matching word count vectors)
+        System.out.println("Learned topics (as distributions over vocab of " + ldaModel.vocabSize()
+                + " words):");
+        Matrix topics = ldaModel.getTopics();
+        for (int topic = 0; topic < 3; topic++) {
+            System.out.print("Topic " + topic + ":");
+            for (int word = 0; word < ldaModel.vocabSize(); word++) {
+                System.out.print(" " + topics.apply(word, topic));
+            }
+            System.out.println();
+        }
 
 
 

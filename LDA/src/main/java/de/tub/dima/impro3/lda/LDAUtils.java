@@ -72,6 +72,45 @@ public class LDAUtils {
     }
 
 
+    public static DenseMatrix addToMatrix(DenseMatrix matrix, double value) {
+
+        for (int r = 0; r < matrix.numRows(); r++) {
+            for (int c = 0; c < matrix.numCols(); ++c) {
+                matrix.update(r, c, matrix.apply(r,c) + value);
+            }
+        }
+        return matrix;
+    }
+
+
+
+
+    public static DenseMatrix product(DenseMatrix matrix, double value) {
+
+
+        for (int r = 0; r < matrix.numRows(); r++) {
+            for (int c = 0; c < matrix.numCols(); ++c) {
+                matrix.update(r, c, matrix.apply(r,c) * value);
+            }
+        }
+        return matrix;
+    }
+
+
+    public static double[] matrixToVector(double[][] data, int rows, int cols){
+
+        double[] result = new double[rows*cols];
+
+        for (int i = 0; i < rows; i ++)
+            for(int j = 0; j < cols; j++)
+                result[i*j]= data[i][j];
+
+        return result;
+
+
+
+    }
+
     public static DenseVector addToVector(DenseVector vector, double value) {
         double[]  result = new double[vector.size()];
         for (int c = 0; c < vector.size(); ++c) {
@@ -137,6 +176,61 @@ public class LDAUtils {
 
       return result;
     }
+
+
+
+
+    public static DenseMatrix outer(DenseVector initial, DenseVector other){
+
+
+        double[][] temp = outer(initial.data(), other.data());
+        double[] data = matrixToVector(temp, initial.size(), other.size());
+
+        return new DenseMatrix(initial.size(), other.size(), data);
+    }
+
+
+
+    public static double [][] outer(double[] a, double[] b){
+        double  [][] result = new double[a.length][];
+        for(int i=0; i< a.length; ++i){
+            result[i] = new double[b.length];
+            for(int j=0; j<b.length;++j){
+                result[i][j] = a[i] *b[j] ;
+            }
+        }
+        return result ;
+    }
+
+
+    public static DenseMatrix incrementColumns(DenseMatrix initial, int[] columns, DenseMatrix inc) {
+        if (initial.numRows() != inc.numRows()) {
+            throw new IllegalArgumentException("Incompatible number of rows");
+        }
+        for (int r = 0; r < initial.data().length; ++r) {
+            for (int c = 0; c < columns.length; ++c) {
+                initial.update(r,columns[c], inc.apply(r,c));
+            }
+        }
+
+        return initial;
+    }
+
+
+
+    public static DenseMatrix sum(DenseMatrix m1, DenseMatrix m2) {
+
+        double[] result = new double[m1.numRows()*m2.numCols()];
+
+        for(int i = 0; i < result.length; i++)
+            result[i] = m1.data()[i] + m2.data()[i];
+
+
+        return new DenseMatrix(m1.numRows(), m2.numCols(), result);
+
+    }
+
+
 
 
     public static DenseVector product(DenseVector v1, DenseVector v2) {

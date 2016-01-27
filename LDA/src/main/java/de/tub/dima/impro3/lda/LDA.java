@@ -83,7 +83,6 @@ public class LDA {
         int iter = 0;
 
         while(iter < maxIterations){
-
             state.next();
             iter++;
         }
