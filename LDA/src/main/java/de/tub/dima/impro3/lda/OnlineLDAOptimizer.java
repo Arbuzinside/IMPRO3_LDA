@@ -11,10 +11,11 @@ import org.apache.commons.math3.random.MersenneTwister;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
-import org.apache.flink.api.common.functions.RichMapPartitionFunction;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.math.DenseMatrix;
 import org.apache.flink.ml.math.DenseVector;
@@ -180,7 +181,13 @@ public class OnlineLDAOptimizer {
 
         DataSet<Tuple2<Long, DenseVector>> batch = docs;
 
-        return this.submitMiniBatch(batch);
+        try {
+            return this.submitMiniBatch(batch);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
     }
 
 
@@ -198,38 +205,34 @@ public class OnlineLDAOptimizer {
     }
 
 
-    OnlineLDAOptimizer submitMiniBatch(DataSet<Tuple2<Long, DenseVector>> batch){
+    OnlineLDAOptimizer submitMiniBatch(DataSet<Tuple2<Long, DenseVector>> batch) throws Exception {
+
 
         this.iteration += 1;
         int vocabSize = this.vocabSize;
 
         try {
-
             this.gamma = getGammaMatrix(K, vocabSize);
-
         }catch(Exception ex){
             ex.printStackTrace();
         }
 
-
         DenseMatrix eLogTheta =   LDAUtils.dirichletExpectation(this.gamma);
         DenseMatrix expELogBeta = LDAUtils.exp(eLogTheta);
-
-
         DataSet<DenseMatrix> broadcast = ExecutionEnvironment.getExecutionEnvironment().fromElements(expELogBeta);
-
-
         double alpha = this.alpha;
         //variational parameter over documents x topics
         //parameters over documents x topics
         double gammaShape = this.gammaShape;
 
+        //filter empty docs out
         DataSet<Tuple2<Long, DenseVector>> filteredDocs = batch.filter(new docFilter());
 
+        //provide local index to the docs
         DataSet<Tuple2<Long, Tuple2<Long, DenseVector>>> localBatchIndex =  filteredDocs.map(new batchIndex()).setParallelism(1);
 
 
-
+        //prepare common parameters
         Configuration params = new Configuration();
         params.setInteger("k", K);
         params.setInteger("vocabSize", vocabSize);
@@ -237,19 +240,46 @@ public class OnlineLDAOptimizer {
         params.setDouble("gammaShape", gammaShape);
 
 
-        DataSet<Tuple2<DenseMatrix, List<DenseVector>>> stats = localBatchIndex.mapPartition(new batchMapper()).withParameters(params).withBroadcastSet(broadcast, "broadcast");
+        DataSet<Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>>> expectation = localBatchIndex.flatMap(new batchMapper())
+                .withParameters(params).withBroadcastSet(broadcast, "broadcast");
+
+        DenseMatrix stats = DenseMatrix.zeros(K, vocabSize);
+
+        DataSet<DenseMatrix> docStats = expectation.map(new MapFunction<Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>>, DenseMatrix>() {
+            @Override
+            public DenseMatrix map(Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>> exp) throws Exception {
+                return exp.f1.f1;
+            }
+        });
+
+
+        DataSet<Tuple2<Long, DenseVector>> docVects = expectation.map(new MapFunction<Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>>, Tuple2<Long, DenseVector>>() {
+            @Override
+            public Tuple2<Long, DenseVector> map(Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>> exp) throws Exception {
+                return new Tuple2<>(exp.f0, exp.f1.f2);
+            }
+        });
+
+
+        DataSet<DenseMatrix> statsSum = docStats.reduce(new statReducer());
+
+
+        List<Tuple2<Long, DenseVector>> list = docVects.collect();
 
 
 
-        DataSet<DenseMatrix> statsSum = stats.map(new matrixMapper()).reduce(new statReducer());
-        DataSet<DenseMatrix> gammaT = stats.map(new gammaMapper()).reduce(new gammaReducer()).map(new listToMatrix());
+
+
 
         try {
             DenseMatrix statsRes = statsSum.collect().get(0);
-            DenseMatrix gammaRes = gammaT.collect().get(0);
+
 
             DenseVector batchVector = LDAUtils.product(new DenseVector(statsRes.data()), new DenseVector(expELogBeta.data()));
             DenseMatrix batchResult = new DenseMatrix(statsRes.numRows(), expELogBeta.numCols(), batchVector.data());
+
+
+
 
 
             updateLambda(batchResult, Math.ceil(miniBatchFraction * (double) corpusSize));
@@ -285,6 +315,8 @@ public class OnlineLDAOptimizer {
     }
 
 
+
+
     //TODO: optimization not sure if needed
     private void updateAlpha(){
 
@@ -293,38 +325,9 @@ public class OnlineLDAOptimizer {
     }
 
 
-    public static class listToMatrix implements MapFunction<List<DenseVector>, DenseMatrix>{
 
 
-        @Override
-        public DenseMatrix map(List<DenseVector> denseVectors) throws Exception {
 
-
-            double[] data = new double[denseVectors.size() * denseVectors.get(0).size()];
-
-
-            int i = 0;
-            for (int j = 0; j < denseVectors.size(); j++){
-                DenseVector current = denseVectors.get(j);
-                for (i = 0; i < current.size() ; i++)
-                        data[i*j] = current.apply(i);
-            }
-
-            return new DenseMatrix(denseVectors.size(), denseVectors.get(0).size(),data);
-
-        }
-    }
-
-    // ReduceFunction that sums Integers
-    public static class gammaReducer implements ReduceFunction<List<DenseVector>> {
-
-        @Override
-        public List<DenseVector> reduce(List<DenseVector> list1, List<DenseVector> list2) throws Exception {
-
-            list1.addAll(list2);
-            return list1;
-        }
-    }
 
 
 
@@ -339,23 +342,10 @@ public class OnlineLDAOptimizer {
     }
 
 
-    public static class gammaMapper implements MapFunction<Tuple2<DenseMatrix, List<DenseVector>>, List<DenseVector>>{
-        @Override
-        public List<DenseVector> map(Tuple2<DenseMatrix, List<DenseVector>> input) throws Exception {
-            return input.f1 ;
-        }
-    }
 
 
-    public static class matrixMapper implements MapFunction<Tuple2<DenseMatrix, List<DenseVector>>, DenseMatrix>{
-        @Override
-        public DenseMatrix map(Tuple2<DenseMatrix, List<DenseVector>> input) throws Exception {
-            return input.f0 ;
-        }
-    }
 
-
-    public static class batchMapper extends RichMapPartitionFunction<Tuple2<Long, Tuple2<Long, DenseVector>>, Tuple2<DenseMatrix, List<DenseVector>>> {
+    public static class batchMapper extends RichFlatMapFunction<Tuple2<Long, Tuple2<Long, DenseVector>>, Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>>> {
 
 
         private int k;
@@ -368,49 +358,38 @@ public class OnlineLDAOptimizer {
         public void open(Configuration parameters) {
             this.k = parameters.getInteger("k", 10);
             this.vocabSize = parameters.getInteger("vocabSize", 10000);
-            this.alpha = parameters.getDouble("alpha", 1/10d);
+            this.alpha = parameters.getDouble("alpha", 1 / 10d);
             this.gammaShape = parameters.getDouble("gammaShape", 100d);
 
             List<DenseMatrix> beta = getRuntimeContext().getBroadcastVariable("broadcast");
-            this.expELogBeta = beta.get(0);
 
+
+            this.expELogBeta = beta.get(0);
         }
 
 
-        DenseMatrix stats = DenseMatrix.zeros(k, vocabSize);
-        List<DenseVector> gammaPart = new ArrayList<>();
 
         @Override
-        public void mapPartition(Iterable<Tuple2<Long, Tuple2<Long, DenseVector>>> docs, Collector<Tuple2<DenseMatrix, List<DenseVector>>> collector) throws Exception {
+        public void flatMap(Tuple2<Long, Tuple2<Long, DenseVector>> docs, Collector<Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>>> collector) throws Exception {
 
 
-            List<Double> vector;
-
-            int[] ids = null;
-            int[] cts;
+            Tuple2<Long, DenseVector> doc = docs.f1;
+            DenseVector wordCounts = doc.f1;
 
 
+            //TODO: check broadcast variables
+            Tuple2<DenseVector, DenseMatrix> result = variationalTopicInference(wordCounts, expELogBeta, alpha, gammaShape, k);
 
 
 
-            while(docs.iterator().hasNext()) {
-                Tuple2<Long, DenseVector> doc = docs.iterator().next().f1;
-                DenseVector termCounts = doc.f1;
 
+            Tuple3<Long, DenseMatrix, DenseVector> outResult = new Tuple3<>(docs.f1.f0, result.f1, result.f0);
 
-                //TODO: check broadcast variables
-                Tuple2<DenseVector, DenseMatrix> result = variationalTopicInference(termCounts, expELogBeta, alpha, gammaShape, k);
-
-
-                //update result
-                gammaPart.add(doc.f0.intValue(), result.f0);
-                stats  = LDAUtils.incrementColumns(stats, ids, result.f1);
-
-            }
-
-            collector.collect(new Tuple2<>(stats,gammaPart));
+            collector.collect(new Tuple2<>(docs.f0, outResult));
 
         }
+
+
     }
 
     public static class docFilter implements FilterFunction<Tuple2<Long, DenseVector>> {
@@ -461,7 +440,11 @@ public class OnlineLDAOptimizer {
             RandBasis randBasis = new RandBasis(new MersenneTwister(randomGenerator.nextLong()));
             ClassTag<Double> tag = scala.reflect.ClassTag$.MODULE$.apply(Double.class);
 
-            DenseVector gammaD =  new DenseVector(new Gamma(gammaShape, 1.0 / gammaShape, randBasis).samplesVector(K, tag).data$mcD$sp());
+
+
+            double[] d = ArrayUtils.toPrimitive((Double[]) new Gamma(gammaShape, 1.0 / gammaShape, randBasis).samplesVector(K, tag).data());
+
+            DenseVector gammaD =  new DenseVector(d);
 
 
             DenseVector expELogThetaD = LDAUtils.exp(LDAUtils.dirichletExpectation(gammaD));
