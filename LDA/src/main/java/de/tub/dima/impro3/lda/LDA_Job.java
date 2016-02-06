@@ -54,7 +54,7 @@ public class LDA_Job {
         for (int topic = 0; topic < 3; topic++) {
             System.out.print("Topic " + topic + ":");
             for (int word = 0; word < ldaModel.vocabSize(); word++) {
-                System.out.print(" " + topics.apply(word, topic));
+                System.out.print(" " + topics.apply(topic, word));
             }
             System.out.println();
         }

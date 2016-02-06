@@ -1,12 +1,11 @@
 package de.tub.dima.impro3.lda;
 
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.math.special.Gamma;
 import org.apache.flink.ml.math.DenseMatrix;
 import org.apache.flink.ml.math.DenseVector;
 
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -34,24 +33,24 @@ public class LDAUtils {
     }
 
 
-    public static DenseMatrix extractColumns(DenseMatrix matrix, List<Integer> rows){
+    public static DenseMatrix extractColumns(DenseMatrix matrix, List<Integer> colums){
 
-        ArrayList<Double> betaElements = new ArrayList<>(rows.size()* matrix.numCols());
 
-        while (rows.iterator().hasNext()){
 
-            int currentRow = rows.iterator().next();
+        Iterator<Integer> iter;
+        DenseMatrix output = DenseMatrix.zeros(matrix.numRows(), colums.size());
 
-            for (int i = 0; i < matrix.numCols(); i ++){
-                betaElements.add(matrix.apply(currentRow, i));
+        for (int i = 0; i < matrix.numRows(); i ++){
+            iter = colums.iterator();
+            int j = 0;
+                while (iter.hasNext()){
+                    int currentCol = iter.next();
+                output.update(i, j, matrix.apply(i, currentCol));
+                    j++;
             }
         }
 
-
-        Double[] array = new Double[rows.size()*matrix.numCols()];
-        betaElements.toArray(array);
-
-        return new DenseMatrix(rows.size(), matrix.numCols(), ArrayUtils.toPrimitive(array));
+        return output;
 
     }
 

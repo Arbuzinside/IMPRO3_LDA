@@ -19,11 +19,12 @@ public class LDAModel {
 
 
 
-    public LDAModel(DenseMatrix topics, double docConcentration, double topicConcentration, double gammaShape) {
+    public LDAModel(DenseMatrix topics, double docConcentration, double topicConcentration, double gammaShape, long vocabSize) {
         this.setTopics(topics);
         this.setDocConcentration(docConcentration);
         this.setTopicConcentration(topicConcentration);
         this.setGammaShape(gammaShape);
+        this.vocabSize = vocabSize;
     }
 
     public DenseMatrix getTopics() {

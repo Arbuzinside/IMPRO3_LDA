@@ -22,59 +22,22 @@ public class LDA {
 
 
 
-    public LDA() {
 
+
+    public LDA() {
         this.setK(10);
         this.setMaxIterations(20);
-        this.setAlpha(1d/K);
-        this.setBeta(1d/K);
+        this.setAlpha(-1.0);
+        this.setBeta(-1.0);
         this.setSeed(new Random().nextLong());
         this.ldaOptimizer = new OnlineLDAOptimizer();
     }
 
-    public LDA(int k, int maxIterations, double alpha, double beta) {
-
-        this();
-        this.setK(k);
-        this.setBeta(beta);
-        this.setAlpha(alpha);
-        this.setMaxIterations(maxIterations);
-
-    }
 
 
-    public void computePTopic() {
 
 
-    }
 
-
-    /**
-     * Learn an LDA model using the given dataset.
-     *
-     * @param documents RDD of documents, which are term (word) count vectors paired with IDs.
-     *                  The term count vectors are "bags of words" with a fixed-size vocabulary
-     *                  (where the vocabulary size is the length of the vector).
-     *                  Document IDs must be unique and >= 0.
-     * @return Inferred LDA model
-     */
-
-
-    /*
-    def run(documents: RDD[(Long, Vector)]): LDAModel = {
-        val state = ldaOptimizer.initialize(documents, this)
-        var iter = 0
-        val iterationTimes = Array.fill[Double](maxIterations)(0)
-        while (iter < maxIterations) {
-            val start = System.nanoTime()
-            state.next()
-            val elapsedSeconds = (System.nanoTime() - start) / 1e9
-            iterationTimes(iter) = elapsedSeconds
-            iter += 1
-        }
-        state.getLDAModel(iterationTimes)
-    }
-        */
 
     public LDAModel run(DataSet<Tuple2<Long, DenseVector>> corpus){
 
@@ -132,7 +95,7 @@ public class LDA {
 
 
     public LDA setBeta(Double topicConcentration) {
-        this.beta= topicConcentration;
+        this.beta = topicConcentration;
         return this;
     }
 

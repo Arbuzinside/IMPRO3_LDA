@@ -137,13 +137,14 @@ public class OnlineLDAOptimizer {
             //TODO: vocab size in unclear
             this.vocabSize = docs.collect().get(0).f1.size();
 
-            this.alpha = lda.getAlpha();
+            this.alpha = 1.0 /lda.getK();
             this.docs = docs;
 
             // Initialize the variational distribution q(beta|lambda)
             randomGenerator = new Random(lda.getSeed());
             this.lambda = getGammaMatrix(K, vocabSize);
             this.iteration = 0;
+            this.eta = 1.0 / lda.getK();
 
 
         } catch (Exception ex){
@@ -199,7 +200,7 @@ public class OnlineLDAOptimizer {
 
         DenseMatrix res = new DenseMatrix(lambda.numRows(), lambda.numCols(), LDAUtils.matrixToVector(temp, temp.length, temp[0].length));
 
-        return new LDAModel(res, this.alpha, this.eta, this.gammaShape);
+        return new LDAModel(res, this.alpha, this.eta, this.gammaShape, this.vocabSize);
 
 
     }
@@ -252,7 +253,7 @@ public class OnlineLDAOptimizer {
             }
         });
 
-
+        //check gamma function
         DataSet<Tuple2<Long, DenseVector>> docVects = expectation.map(new MapFunction<Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>>, Tuple2<Long, DenseVector>>() {
             @Override
             public Tuple2<Long, DenseVector> map(Tuple2<Long, Tuple3<Long, DenseMatrix, DenseVector>> exp) throws Exception {
@@ -261,20 +262,18 @@ public class OnlineLDAOptimizer {
         });
 
 
-        DataSet<DenseMatrix> statsSum = docStats.reduce(new statReducer());
 
+
+        DataSet<DenseMatrix> statsSum = docStats.reduce(new statReducer());
 
         List<Tuple2<Long, DenseVector>> list = docVects.collect();
 
 
 
-
-
-
         try {
+
+
             DenseMatrix statsRes = statsSum.collect().get(0);
-
-
             DenseVector batchVector = LDAUtils.product(new DenseVector(statsRes.data()), new DenseVector(expELogBeta.data()));
             DenseMatrix batchResult = new DenseMatrix(statsRes.numRows(), expELogBeta.numCols(), batchVector.data());
 
@@ -377,6 +376,8 @@ public class OnlineLDAOptimizer {
             DenseVector wordCounts = doc.f1;
 
 
+
+
             //TODO: check broadcast variables
             Tuple2<DenseVector, DenseMatrix> result = variationalTopicInference(wordCounts, expELogBeta, alpha, gammaShape, k);
 
@@ -420,28 +421,29 @@ public class OnlineLDAOptimizer {
     public static Tuple2<DenseVector, DenseMatrix> variationalTopicInference(DenseVector termCounts, DenseMatrix expELogBeta, double alpha,
                                                                              double gammaShape, Integer K){
 
-        Tuple2<List<Integer>, double[]> IdCounts;
-
-        //TODO: check what is list
-        List<Integer> vector = new ArrayList<>(termCounts.size());
 
 
-        IdCounts = new Tuple2<>(vector, termCounts.data());
+
+        List<Integer> ids = new ArrayList<>(termCounts.size());
+
+        double[] cts = termCounts.data();
 
 
-        List<Integer> ids = IdCounts.f0;
-        double[] cts = IdCounts.f1;
+        for(int i = 0; i< termCounts.size(); i++){
+            ids.add(i, i);
+        }
 
 
-        if(ids != null && cts != null) {
+
+
+
+
+        if(!ids.isEmpty() && cts != null) {
 
 
             //TODO: check random function
             RandBasis randBasis = new RandBasis(new MersenneTwister(randomGenerator.nextLong()));
             ClassTag<Double> tag = scala.reflect.ClassTag$.MODULE$.apply(Double.class);
-
-
-
             double[] d = ArrayUtils.toPrimitive((Double[]) new Gamma(gammaShape, 1.0 / gammaShape, randBasis).samplesVector(K, tag).data());
 
             DenseVector gammaD =  new DenseVector(d);
@@ -456,6 +458,8 @@ public class OnlineLDAOptimizer {
 
 
             // Iterate between gamma and phi until convergence
+
+
             for (int it=0; it < NUM_ITERATIONS; ++it) {
 
                 lastGamma = gammaD.copy();
