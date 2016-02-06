@@ -16,16 +16,9 @@ public class LDAUtils {
 
 
 
-    public static DenseMatrix dirichletExpectation(DenseMatrix matrix) {
-
-        return new DenseMatrix(matrix.numRows(),matrix.numCols(), dirichletExpectation(matrix.data()));
-    }
 
 
-    /**
-     * TODO: check if the exp works for matrices
-     *
-     */
+
 
 
     public static DenseVector dirichletExpectation(DenseVector vector) {
@@ -33,22 +26,21 @@ public class LDAUtils {
     }
 
 
-    public static DenseMatrix extractColumns(DenseMatrix matrix, List<Integer> colums){
 
 
 
-        Iterator<Integer> iter;
-        DenseMatrix output = DenseMatrix.zeros(matrix.numRows(), colums.size());
 
-        for (int i = 0; i < matrix.numRows(); i ++){
-            iter = colums.iterator();
-            int j = 0;
-                while (iter.hasNext()){
-                    int currentCol = iter.next();
-                output.update(i, j, matrix.apply(i, currentCol));
-                    j++;
-            }
-        }
+    public static DenseMatrix extractRows(DenseMatrix matrix, List<Integer> rows){
+
+
+
+        DenseMatrix output = DenseMatrix.zeros(rows.size(), matrix.numCols());
+
+        for (int i = 0; i < rows.size(); i ++)
+            for(int j = 0; j < matrix.numCols(); j++)
+                output.update(i, j, matrix.apply(i, j));
+
+
 
         return output;
 
@@ -56,19 +48,7 @@ public class LDAUtils {
 
 
 
-    public static double[][] vectorToMatrix(double[] data, int rows, int cols){
 
-
-        double[][] result = new double[rows][cols];
-
-        for(int i=0; i < rows; i ++)
-            for(int j = 0; j < cols; j++)
-                result[i][j] = data[i+j];
-
-
-        return result;
-
-    }
 
 
     public static DenseMatrix addToMatrix(DenseMatrix matrix, double value) {
@@ -96,19 +76,7 @@ public class LDAUtils {
     }
 
 
-    public static double[] matrixToVector(double[][] data, int rows, int cols){
 
-        double[] result = new double[rows*cols];
-
-        for (int i = 0; i < rows; i ++)
-            for(int j = 0; j < cols; j++)
-                result[i*j]= data[i][j];
-
-        return result;
-
-
-
-    }
 
     public static DenseVector addToVector(DenseVector vector, double value) {
         double[]  result = new double[vector.size()];
@@ -130,90 +98,81 @@ public class LDAUtils {
         return new DenseVector(result);
     }
 
-    public static DenseVector dot(double[] m1, double[][] m2) {
-        if(m1.length != m2 .length){
-            throw new IllegalArgumentException("Length of vector " + m1.length
-                    + " does not match the number of matrix rows " + m2 .length);
-        }
-        double [] result = new double[m2[0].length];
-        Arrays.fill(result, 0d);
 
-        for (int c = 0; c < m2[0].length; ++c) {
-            for(int i=0; i< m1.length;++i){
-                result[c] += m1[i] *m2[i][c];
-            }
-        }
-        double [] app =  new double[m2[0].length];
 
-        for(int i=0; i< m2[0].length;++i){
-            app[i] = result[i];
-        }
-        return new DenseVector(app);
+
+
+
+
+    public static DenseVector dot(DenseMatrix m, DenseVector v) {
+
+
+        if (v.size() != m.numCols())
+            throw new ArrayIndexOutOfBoundsException("wrong size");
+
+
+        double [] result = new double[m.numRows()];
+
+        for (int i = 0; i < m.numRows(); i++)
+            for(int j = 0; j < v.size(); j ++)
+                result[i] += m.apply(i, j) * v.apply(j);
+
+
+        return new DenseVector(result);
+
     }
 
-    //TODO: optimize, it's bullshit
-    public static double[][] transpose(DenseMatrix mtx) {
+
+
+
+
+
+
+    public static DenseMatrix transpose(DenseMatrix mtx) {
 
         int numRows = mtx.numRows();
         int numCols = mtx.numCols();
 
 
-        double[][] matrix = new double[numRows][numCols];
-
-        for(int i=0; i < numRows; i ++)
-            for(int j = 0; j < numCols; j++)
-                matrix[i][j] = mtx.data()[i+j];
+        DenseMatrix output = DenseMatrix.zeros(mtx.numCols(), mtx.numRows());
 
 
-        double[][] result = new double[numCols][];
-        for (int r = 0; r < numCols; ++r) {
-            result[r] = new double[numRows];
-            for (int c = 0; c < numRows; ++c) {
-                result[r][c] = matrix[c][r];
+        for (int c = 0 ; c < numRows ; c++)
+            for (int d = 0 ; d < numCols ; d++)
+                output.update(d,c, mtx.apply(c,d));
+
+
+
+
+        return output;
+
+
+    }
+
+
+
+
+
+
+
+    public static DenseMatrix outer(DenseVector a, DenseVector b){
+
+
+        DenseMatrix out = DenseMatrix.zeros(a.size(), b.size());
+
+        for(int i=0; i< a.size(); ++i){
+            for(int j=0; j<b.size();++j){
+                out.update(i,j, a.apply(i) * b.apply(j));
             }
         }
+        return out ;
 
-      return result;
+
     }
 
 
 
 
-    public static DenseMatrix outer(DenseVector initial, DenseVector other){
-
-
-        double[][] temp = outer(initial.data(), other.data());
-        double[] data = matrixToVector(temp, initial.size(), other.size());
-
-        return new DenseMatrix(initial.size(), other.size(), data);
-    }
-
-
-
-    public static double [][] outer(double[] a, double[] b){
-        double  [][] result = new double[a.length][];
-        for(int i=0; i< a.length; ++i){
-            result[i] = new double[b.length];
-            for(int j=0; j<b.length;++j){
-                result[i][j] = a[i] *b[j] ;
-            }
-        }
-        return result ;
-    }
-
-
-    public static DenseMatrix incrementColumns(DenseMatrix initial, int[] columns, DenseMatrix inc) {
-        if (initial.numRows() != inc.numRows()) {
-            throw new IllegalArgumentException("Incompatible number of rows");
-        }
-        for (int r = 0; r < initial.data().length; ++r) {
-            for (int c = 0; c < columns.length; ++c) {
-                initial.update(r,columns[c], inc.apply(r,c));
-            }
-        }
-
-        return initial;
-    }
 
 
 
@@ -255,8 +214,50 @@ public class LDAUtils {
             result[i] = Gamma.digamma(array[i]) - d;
         }
         return result;
-
     }
+
+
+
+    /**
+     * Digamma function (the first derivative of the logarithm of the gamma function).
+     * @param array   - variational parameter
+     * @return
+     */
+    static DenseMatrix dirichletExpectation(DenseMatrix matrix) {
+
+
+        int numRows = matrix.numRows();
+        int numCols = matrix.numCols();
+
+        double[] vector = new double[numRows];
+        Arrays.fill(vector, 0.0);
+
+        for (int k = 0; k < numRows; ++k) {
+            for (int w = 0; w < numCols; ++w) {
+                try{
+                    vector[k] += matrix.apply(k, w);
+                }catch (Exception e){
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+        for (int k = 0; k < numRows; ++k) {
+            vector[k] = Gamma.digamma(vector[k]);
+        }
+
+        DenseMatrix output = DenseMatrix.zeros(numRows, numCols);
+
+
+        for (int k = 0; k < numRows; ++k) {
+            for (int w = 0; w < numCols; ++w) {
+                double z =  Gamma.digamma(matrix.apply(k,w));
+                output.update(k,w, z - vector[k]);
+            }
+        }
+        return output;
+    }
+
+
 
 
     public static boolean closeTo(DenseVector initial, DenseVector other, double within){
@@ -286,10 +287,25 @@ public class LDAUtils {
         return new DenseVector(exp(vector.data()));
     }
 
-    public static DenseMatrix exp(DenseMatrix matrix) {
-        return new DenseMatrix(matrix.numRows(), matrix.numCols(),exp(matrix.data()));
-    }
 
+
+
+    public static DenseMatrix exp(DenseMatrix matrix) {
+
+
+        int nc = matrix.numCols();
+        int nr = matrix.numRows();
+
+
+        DenseMatrix output = DenseMatrix.zeros(nr, nc);
+
+        for (int k = 0; k < nr; ++k) {
+            for (int w = 0; w < nc; ++w) {
+                output.update(k, w, Math.exp(matrix.apply(k,w)));
+            }
+        }
+        return output;
+    }
 
 
 

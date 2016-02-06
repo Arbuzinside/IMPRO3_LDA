@@ -47,7 +47,7 @@ public class OnlineLDAOptimizer {
 
     private DataSet<Tuple2<Long, DenseVector>> docs;
 
-    private de.tub.dima.impro3.lda.LDAModel model;
+
     private int iteration;
 
     /**
@@ -56,13 +56,13 @@ public class OnlineLDAOptimizer {
      * Default: 0.51, based on the original Online LDA paper.
      */
     private double gammaShape = 100.0d;
-    private double kappa;
+    private double kappa = 0.51d;
     /**
      * A (positive) learning parameter that downweights early iterations. Larger values make early
      * iterations count less.
      * Default: 1024, following the original Online LDA paper.
      */
-    private  double tau0;
+    private  double tau0 = 1024.0d;
     /**
      * Mini-batch fraction in (0, 1], which sets the fraction of document sampled and used in
      * each iteration.
@@ -81,6 +81,13 @@ public class OnlineLDAOptimizer {
     private  double eta;
 
     private double rhot;
+
+
+    //TODO: implement sampling technique
+
+    private  List<Tuple2<Long, DenseVector>> corpus;
+    int batchSize;
+    private List<Tuple2<Long, DenseVector>> sublist;
 
     // the variational distribution q(beta|lambda)
     private DenseMatrix lambda;
@@ -140,6 +147,10 @@ public class OnlineLDAOptimizer {
             this.alpha = 1.0 /lda.getK();
             this.docs = docs;
 
+
+            this.batchSize = (int) Math.round(docs.count() * miniBatchFraction);
+            this.corpus = docs.collect();
+
             // Initialize the variational distribution q(beta|lambda)
             randomGenerator = new Random(lda.getSeed());
             this.lambda = getGammaMatrix(K, vocabSize);
@@ -180,7 +191,36 @@ public class OnlineLDAOptimizer {
     OnlineLDAOptimizer next(){
 
 
-        DataSet<Tuple2<Long, DenseVector>> batch = docs;
+
+
+        int cSize = corpus.size();
+        int min = 0;
+        min = Math.min(batchSize, cSize);
+
+
+        ArrayList<Tuple2<Long, DenseVector>> b = new ArrayList<>();
+
+
+        for (int i = 0; i < min; i ++){
+            b.add(corpus.get(i));
+        }
+
+        for (int i = 0; i < min; i ++){
+            corpus.remove(i);
+        }
+
+
+
+        if (b.isEmpty())
+            return  this;
+
+
+        DataSet<Tuple2<Long, DenseVector>> batch = ExecutionEnvironment
+                                                        .getExecutionEnvironment()
+                                                        .fromCollection(b);
+
+
+
 
         try {
             return this.submitMiniBatch(batch);
@@ -196,9 +236,7 @@ public class OnlineLDAOptimizer {
     LDAModel getLDAModel(){
 
 
-        double[][] temp = LDAUtils.transpose(lambda);
-
-        DenseMatrix res = new DenseMatrix(lambda.numRows(), lambda.numCols(), LDAUtils.matrixToVector(temp, temp.length, temp[0].length));
+        DenseMatrix res = lambda;
 
         return new LDAModel(res, this.alpha, this.eta, this.gammaShape, this.vocabSize);
 
@@ -212,15 +250,20 @@ public class OnlineLDAOptimizer {
         this.iteration += 1;
         int vocabSize = this.vocabSize;
 
-        try {
-            this.gamma = getGammaMatrix(K, vocabSize);
-        }catch(Exception ex){
-            ex.printStackTrace();
-        }
 
-        DenseMatrix eLogTheta =   LDAUtils.dirichletExpectation(this.gamma);
+
+
+
+
+        DenseMatrix eLogTheta =   LDAUtils.dirichletExpectation(this.lambda);
+
+
         DenseMatrix expELogBeta = LDAUtils.exp(eLogTheta);
-        DataSet<DenseMatrix> broadcast = ExecutionEnvironment.getExecutionEnvironment().fromElements(expELogBeta);
+
+        DenseMatrix expELogBetaTr = LDAUtils.transpose(expELogBeta);
+
+
+        DataSet<DenseMatrix> broadcast = ExecutionEnvironment.getExecutionEnvironment().fromElements(expELogBetaTr);
         double alpha = this.alpha;
         //variational parameter over documents x topics
         //parameters over documents x topics
@@ -299,7 +342,7 @@ public class OnlineLDAOptimizer {
 
     private void updateLambda(DenseMatrix stat, double batchSize){
 
-        double weight = this.rhot;
+        double weight = countRho();
 
 
         DenseMatrix a = LDAUtils.product(lambda, 1 - weight);
@@ -311,6 +354,13 @@ public class OnlineLDAOptimizer {
 
 
 
+    }
+
+
+    private double countRho(){
+
+
+        return Math.pow(tau0 + this.iteration, -this.kappa);
     }
 
 
@@ -450,8 +500,8 @@ public class OnlineLDAOptimizer {
 
 
             DenseVector expELogThetaD = LDAUtils.exp(LDAUtils.dirichletExpectation(gammaD));
-            DenseMatrix expELogBetaD = LDAUtils.extractColumns(expELogBeta, ids);
-            DenseVector phiNorm = LDAUtils.dot(expELogThetaD.data(), LDAUtils.vectorToMatrix(expELogBetaD.data(),expELogBetaD.numRows(),expELogBetaD.numCols()));
+            DenseMatrix expELogBetaD = LDAUtils.extractRows(expELogBeta, ids);
+            DenseVector phiNorm = LDAUtils.dot(expELogBetaD, expELogThetaD);
             phiNorm = LDAUtils.addToVector(phiNorm, 1.0E-100D);
 
             DenseVector lastGamma;
@@ -465,7 +515,7 @@ public class OnlineLDAOptimizer {
                 lastGamma = gammaD.copy();
 
                 DenseVector temp = LDAUtils.divideVectors(new DenseVector(cts), phiNorm);
-                DenseVector v1 = LDAUtils.dot(temp.data(), LDAUtils.transpose(expELogBetaD));
+                DenseVector v1 = LDAUtils.dot(LDAUtils.transpose(expELogBetaD), temp);
                 DenseVector v2 = LDAUtils.product(expELogThetaD, v1);
 
                 gammaD = LDAUtils.addToVector(v2, alpha);
@@ -473,7 +523,7 @@ public class OnlineLDAOptimizer {
                 expELogThetaD = LDAUtils.exp(LDAUtils.dirichletExpectation(gammaD));
 
 
-                phiNorm = LDAUtils.dot(expELogThetaD.data(), LDAUtils.vectorToMatrix(expELogBetaD.data(),expELogBetaD.numRows(),expELogBetaD.numCols()));
+                phiNorm = LDAUtils.dot(expELogBetaD, expELogThetaD);
                 phiNorm = LDAUtils.addToVector(phiNorm, 1.0E-100D);
 
                 if (LDAUtils.closeTo(gammaD,lastGamma, MEAN_CHANGE_THRESHOLD*K))
@@ -482,7 +532,7 @@ public class OnlineLDAOptimizer {
 
 
 
-            DenseVector temp = LDAUtils.divideVectors(new DenseVector(cts),phiNorm);
+            DenseVector temp = LDAUtils.divideVectors(new DenseVector(cts),  phiNorm);
             DenseMatrix sstatsD =  LDAUtils.outer(expELogThetaD, temp);
 
 

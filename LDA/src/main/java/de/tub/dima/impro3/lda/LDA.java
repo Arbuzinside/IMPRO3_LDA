@@ -16,7 +16,7 @@ public class LDA {
     private Integer maxIterations;
     private Double alpha;
     private Double beta;
-    private de.tub.dima.impro3.lda.OnlineLDAOptimizer ldaOptimizer;
+    private OnlineLDAOptimizer ldaOptimizer;
     private long seed;
 
 
@@ -44,6 +44,8 @@ public class LDA {
         OnlineLDAOptimizer state = this.ldaOptimizer.initialize(corpus, this);
 
         int iter = 0;
+
+
 
         while(iter < maxIterations){
             state.next();
@@ -108,4 +110,7 @@ public class LDA {
         this.seed = seed;
         return this;
     }
+
+
 }
+
