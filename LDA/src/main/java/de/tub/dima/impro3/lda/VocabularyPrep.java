@@ -2,6 +2,7 @@ package de.tub.dima.impro3.lda;
 
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -42,7 +43,7 @@ public class VocabularyPrep {
             sWords.add(word);
 
         // conditional counter per word per label
-        DataSet<String> filteredTerms = terms.filter(new FilterWords()).distinct();
+        DataSet<String> filteredTerms = terms.filter(new FilterWords()).groupBy(0).reduceGroup(new DistinctReduce()); 
 
 
         DataSet<Tuple2<Long, String>> vocabulary = DataSetUtils.zipWithUniqueId(filteredTerms).sortPartition(1, Order.ASCENDING);
@@ -116,4 +117,30 @@ public class VocabularyPrep {
     }
 
 
+    
+    
+	public static class DistinctReduce implements GroupReduceFunction<String, String> {
+
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		public void reduce(Iterable<String> in, Collector<String> out) {
+
+			Set<String> uniqStrings = new HashSet<String>();
+
+			// add all strings of the group to the set
+			for (String t : in) {
+				uniqStrings.add(t);
+			}
+
+			// emit all unique strings.
+			for (String s : uniqStrings) {
+				out.collect(s);
+			}
+		}
+	}
+    
 }
