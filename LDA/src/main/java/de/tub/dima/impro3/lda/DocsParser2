@@ -1,0 +1,367 @@
+package de.tub.dima.impro3.processing;
+
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.flink.ml.math.DenseVector;
+
+import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.GroupReduceFunction;
+import org.apache.flink.api.common.functions.JoinFunction;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
+import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.operators.Order;
+import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.operators.SortedGrouping;
+import org.apache.flink.api.java.tuple.Tuple1;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.utils.DataSetUtils;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.util.Collector;
+
+import de.tub.dima.impro3.processing.MailTFIDF.TfIdfComputer;
+import de.tub.dima.impro3.processing.MailTFIDF.UniqueWordExtractor;
+
+
+@SuppressWarnings("serial")
+public class DocsParser2 {
+	
+	// *************************************************************************
+	//     PROGRAM
+	// *************************************************************************
+	
+	public static final String documents_path = "train.tab";
+	
+	public static void main(String[] args) throws Exception {
+
+
+		// set up the execution environment
+		final ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+
+
+		//Step2, read files into HDFS
+		DataSet<Tuple2<String, String>> ldasrc = env.readCsvFile(documents_path)
+															.fieldDelimiter("\t")
+															.ignoreInvalidLines()
+															.types(String.class, String.class)
+															.filter(new LdaSrcFileFilter())
+															.map(new LdaSrcFileMapper());        
+        
+		DataSet<String> stopwordDoc =  env.readTextFile("stop-words.txt");
+         
+         List<String> list  =stopwordDoc.collect();
+         String[] STOP_WORDS = new String[list.size()];
+         STOP_WORDS = list.toArray(STOP_WORDS);
+         
+       
+//        DataSet<Long> numbers = env.generateSequence(1L, expectedSize);
+	
+        DataSet<String> vocab1 = ldasrc
+				// extract unique words from mails
+				.flatMap(new UniqueWordExtractor(STOP_WORDS)).distinct();
+			
+        
+        DataSet<Tuple2<Long, String>> vocab = 
+        		DataSetUtils.zipWithUniqueId(vocab1).sortPartition(1, Order.ASCENDING);
+  
+//        vocab.writeAsCsv("vocab");
+         Long VoacbSize  = vocab.count();
+
+ 		
+         DataSet<Tuple2<Long, Tuple2<String, String>>> docs = 
+         		DataSetUtils.zipWithUniqueId(ldasrc);
+         
+    		// compute the frequency of words within each doc (TF)
+    	 DataSet<Tuple3<Long, String, Integer>> termFrequency = docs
+    				.flatMap(new TFComputer(STOP_WORDS));
+    		
+    	 
+    		DataSet<Tuple3<Long, Long, Double>> DocMatrics = vocab
+    				.leftOuterJoin(termFrequency).where(1).equalTo(1)
+    					.with(new TfIdfComputer(VoacbSize)).sortPartition(0, Order.ASCENDING).sortPartition(1, Order.ASCENDING);
+		
+    		
+		DocMatrics.writeAsCsv("vv");
+		// execute program
+		env.execute("WordCount Example");
+
+	}
+	
+	// *************************************************************************
+	//     USER FUNCTIONS
+	// *************************************************************************
+	
+	/**
+	 * Implements the string tokenizer that splits sentences into words as a user-defined
+	 * FlatMapFunction. The function takes a line (String) and splits it into 
+	 * multiple pairs in the form of "(word,1)" ({@code Tuple2<String, Integer>}).
+	 */
+	public static final class Tokenizer implements FlatMapFunction<String, Tuple1<String>> {
+
+		@Override
+		public void flatMap(String value, Collector<Tuple1<String>> out) {
+			// normalize and split the line
+			String[] tokens = value.toLowerCase().split("\\W+");
+		
+			// emit the pairs
+			for (String token : tokens) {
+			
+				if (token.length() > 1 && token != null) {
+				
+					out.collect(new Tuple1<String>(token));
+				}
+			}
+		}
+	}
+	
+	
+	
+	public static class FilterMapper extends RichFlatMapFunction< String, Tuple2<String,  Integer>> {
+
+		// set of stop words
+		private Set<String> stopWords;
+		// map to count the frequency of words
+		private transient Map<String, Integer> wordCounts;
+		// pattern to match against words
+		private transient Pattern wordPattern;
+
+		public FilterMapper() {
+			this.stopWords = new HashSet<>();
+		}
+
+		public FilterMapper(String[] stopWords) {
+			// initialize stop words
+			this.stopWords = new HashSet<>();
+			Collections.addAll(this.stopWords, stopWords);
+		}
+
+		@Override
+		public void open(Configuration config) {
+			// initialized map and pattern
+			this.wordPattern = Pattern.compile("(\\p{Alpha})+");
+			this.wordCounts = new HashMap<>();
+		}
+
+		@Override
+		public void flatMap(String mail, Collector<Tuple2<String, Integer>> out) throws Exception {
+
+			// clear count map
+			this.wordCounts.clear();
+
+			// tokenize mail body along whitespaces
+			StringTokenizer st = new StringTokenizer(mail);
+			// for each candidate word
+			while(st.hasMoreTokens()) {
+				// normalize to lower case
+				String word = st.nextToken().toLowerCase();
+				Matcher m = this.wordPattern.matcher(word);
+				if(m.matches() && !this.stopWords.contains(word)) {
+					// word matches pattern and is not a stop word -> increase word count
+					int count = 0;
+					if(wordCounts.containsKey(word)) {
+						count = wordCounts.get(word);
+					}
+					wordCounts.put(word, count + 1);
+				}
+			}
+
+			// emit all counted words
+			for(String word : this.wordCounts.keySet()) {
+				out.collect(new Tuple2<>( word, this.wordCounts.get(word)));
+			}
+		}
+	}
+
+	public static class UniqueWordExtractor extends RichFlatMapFunction<Tuple2<String,String>, String> {
+
+		// set of stop words
+		private Set<String> stopWords;
+		// set of emitted words
+		private transient Set<String> emittedWords;
+		// pattern to match against words
+		private transient Pattern wordPattern;
+
+		public UniqueWordExtractor() {
+			this.stopWords = new HashSet<>();
+		}
+
+		public UniqueWordExtractor(String[] stopWords) {
+			// setup stop words set
+			this.stopWords = new HashSet<>();
+			Collections.addAll(this.stopWords, stopWords);
+		}
+
+		@Override
+		public void open(Configuration config) {
+			// init set and word pattern
+			this.emittedWords = new HashSet<>();
+			this.wordPattern = Pattern.compile("(\\p{Alpha})+");
+		}
+
+		@Override
+		public void flatMap(Tuple2<String,String> in, Collector<String> out) throws Exception {
+
+			// clear set of emitted words
+			this.emittedWords.clear();
+			// split body along whitespaces into tokens
+	
+			StringTokenizer st = new StringTokenizer(in.f1);
+
+			// for each word candidate
+			while(st.hasMoreTokens()) {
+				// normalize to lower case
+				String word = st.nextToken().toLowerCase();
+				Matcher m = this.wordPattern.matcher(word);
+				if(m.matches() && !this.stopWords.contains(word) && !this.emittedWords.contains(word)&& word.length()>1) {
+					// candidate matches word pattern, is not a stop word, and was not emitted before
+					out.collect(word);
+					this.emittedWords.add(word);
+				}
+			}
+		}
+	}
+
+	
+	//
+	
+	/**
+	 * Computes the frequency of words in a mails body.
+	 * Words consist only of alphabetical characters. Frequent words (stop words) are filtered out.
+	 */
+	public static class TFComputer extends RichFlatMapFunction< Tuple2<Long, Tuple2<String, String>>, Tuple3<Long, String, Integer>> {
+
+		// set of stop words
+		private Set<String> stopWords;
+		// map to count the frequency of words
+		private transient Map<String, Integer> wordCounts;
+		// pattern to match against words
+		private transient Pattern wordPattern;
+
+		public TFComputer() {
+			this.stopWords = new HashSet<>();
+		}
+
+		public TFComputer(String[] stopWords) {
+			// initialize stop words
+			this.stopWords = new HashSet<>();
+			Collections.addAll(this.stopWords, stopWords);
+		}
+
+		@Override
+		public void open(Configuration config) {
+			// initialized map and pattern
+			this.wordPattern = Pattern.compile("(\\p{Alpha})+");
+			this.wordCounts = new HashMap<>();
+		}
+
+		@Override
+		public void flatMap(Tuple2<Long, Tuple2<String, String>> mail, Collector<Tuple3<Long ,String, Integer>> out) throws Exception {
+
+			// clear count map
+			this.wordCounts.clear();
+
+			// tokenize mail body along whitespaces
+			StringTokenizer st = new StringTokenizer(mail.f1.f1);
+			// for each candidate word
+			while(st.hasMoreTokens()) {
+				// normalize to lower case
+				String word = st.nextToken().toLowerCase();
+				Matcher m = this.wordPattern.matcher(word);
+				if(m.matches() && !this.stopWords.contains(word) && word.length()>1) {
+					// word matches pattern and is not a stop word -> increase word count
+					int count = 0;
+					if(wordCounts.containsKey(word)) {
+						count = wordCounts.get(word);
+					}
+					wordCounts.put(word, count + 1);
+				}
+			}
+
+			// emit all counted words
+			for(String word : this.wordCounts.keySet()) {
+				out.collect(new Tuple3<>(mail.f0, word, this.wordCounts.get(word)));
+			}
+		}
+	}
+	// *************************************************************************
+	//     UTIL METHODS
+	// *************************************************************************
+	/**
+	 * Compute the TF-IDF score for a word in a mail by combining TF, DF, and total mail count.
+	 */
+	public static class TfIdfComputer implements JoinFunction<Tuple2<Long, String>, Tuple3<Long, String, Integer>, Tuple3< Long, Long, Double>> {
+
+		private double mailCount;
+
+		public TfIdfComputer() {}
+
+		public TfIdfComputer(long mailCount) {
+			this.mailCount = (double)mailCount;
+		}
+
+		@Override
+		public Tuple3<Long, Long, Double> join(Tuple2<Long, String> docFreq, Tuple3<Long, String, Integer> termFreq) throws Exception {
+			// compute TF-IDF
+			return new Tuple3<>(
+					termFreq.f0, // word
+					docFreq.f0,
+					(double)termFreq.f2 
+			);
+		}
+	}
+	
+
+	// GroupReduceFunction that removes consecutive identical elements
+	public class DistinctReduce
+	         implements GroupReduceFunction<Tuple2< String, Integer>, Tuple2<Integer, String>> {
+
+	  @Override
+	  public void reduce(Iterable<Tuple2<String, Integer>> in, Collector<Tuple2<Integer, String>> out) {
+	    Integer key = null;
+	    String comp = null;
+
+	    for (Tuple2<String, Integer> t : in) {
+	      key = t.f1;
+	      String next = t.f0;
+
+	      // check if strings are different
+	      if (comp == null || !next.equals(comp)) {
+	        out.collect(new Tuple2<Integer, String>(key, next));
+	        comp = next;
+	      }
+	    }
+}
+	}
+	
+	//
+	@SuppressWarnings("serial")
+	private static class LdaSrcFileFilter implements FilterFunction<Tuple2<String, String>> {
+		@Override
+		public boolean filter(Tuple2<String, String> tuple) throws Exception {
+			return !tuple.f1.isEmpty() && tuple.f1.length() > 0;
+		}
+	}
+	
+	@SuppressWarnings("serial")
+	// INPUT : "document_id, content"
+	// OUTPUT: "document_id, array_of_words"
+	private static class LdaSrcFileMapper implements MapFunction<Tuple2<String, String>, Tuple2<String, String>> {
+		@Override
+		public Tuple2<String, String> map(Tuple2<String, String> arg0) throws Exception {
+			return new Tuple2<String, String>(arg0.f0, arg0.f1);			
+		}
+	}
+	
+}
