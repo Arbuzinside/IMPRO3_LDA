@@ -28,6 +28,8 @@ public class DocToVec {
 
     private static HashMap<String, Long> vocab;
 
+    private final static int wordLength = 3;
+
 
     public static void main(String[] args) throws Exception {
 
@@ -128,11 +130,11 @@ public class DocToVec {
             Arrays.fill(size, 0.0);
             DenseVector output = new DenseVector(size);
 
-            String[] words = input.f1.f1.toLowerCase().split("\\w+");
+            String[] words = input.f1.f1.toLowerCase().split("\\,");
 
 
             for(String word: words){
-                if(word.length() > 4 && !sWords.contains(word)) {
+                if(word.length() > wordLength && !sWords.contains(word)) {
                     if (!docWordCount.containsKey(word))
                         docWordCount.put(word, 1);
                     else {
@@ -146,6 +148,9 @@ public class DocToVec {
 
 
             for(String word: docWordCount.keySet()){
+
+                if (!vocab.containsKey(word))
+                    continue;
                 long index = vocab.get(word);
                 double count = (double) docWordCount.get(word);
                 output.update((int) index, count);

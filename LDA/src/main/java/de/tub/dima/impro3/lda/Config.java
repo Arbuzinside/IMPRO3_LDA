@@ -7,7 +7,7 @@ public class Config {
 
 
 
-    private static final String INPUT_PATH = "src/main/resources/";
+    private static final String INPUT_PATH = "src/resources/";
     private static final String OUTPUT_PATH = "src/results/";
 
 // private static final String INPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/src/test/resources/assignment2/";

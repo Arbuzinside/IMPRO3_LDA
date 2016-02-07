@@ -23,6 +23,8 @@ public class VocabularyPrep {
     private final static Set<String> sWords = new HashSet<String>();
 
 
+    private final static int wordLength = 3;
+
     public static void main(String[] args) throws Exception {
 
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
@@ -67,7 +69,7 @@ public class VocabularyPrep {
         public boolean filter(String word) {
 
 
-            if (!sWords.contains(word) && isAlpha(word) && word.toCharArray().length > 4)
+            if (!sWords.contains(word) && isAlpha(word) && word.toCharArray().length > wordLength)
                 return true;
             else
                 return false;
