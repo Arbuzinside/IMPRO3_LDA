@@ -272,6 +272,7 @@ public class LDAUtils {
         return eps<within;
     }
 
+
     private static double[] exp(double[] array) {
         int nc = array.length;
         double[] result = new double[nc];

@@ -30,7 +30,7 @@ import java.util.Random;
 public class OnlineLDAOptimizer {
 
 
-    public final static double MEAN_CHANGE_THRESHOLD = 1e-5;
+    public final static double MEAN_CHANGE_THRESHOLD = 1e-3;
     public final static int NUM_ITERATIONS = 200;
 
     private static Random randomGenerator;
@@ -491,7 +491,6 @@ public class OnlineLDAOptimizer {
         if(!ids.isEmpty() && cts != null) {
 
 
-            //TODO: check random function
             RandBasis randBasis = new RandBasis(new MersenneTwister(randomGenerator.nextLong()));
             ClassTag<Double> tag = scala.reflect.ClassTag$.MODULE$.apply(Double.class);
             double[] d = ArrayUtils.toPrimitive((Double[]) new Gamma(gammaShape, 1.0 / gammaShape, randBasis).samplesVector(K, tag).data());
@@ -510,7 +509,7 @@ public class OnlineLDAOptimizer {
             // Iterate between gamma and phi until convergence
 
 
-            for (int it=0; it < NUM_ITERATIONS; ++it) {
+            while(true) {
 
                 lastGamma = gammaD.copy();
 
@@ -526,7 +525,7 @@ public class OnlineLDAOptimizer {
                 phiNorm = LDAUtils.dot(expELogBetaD, expELogThetaD);
                 phiNorm = LDAUtils.addToVector(phiNorm, 1.0E-100D);
 
-                if (LDAUtils.closeTo(gammaD,lastGamma, MEAN_CHANGE_THRESHOLD*K))
+                if (LDAUtils.closeTo(gammaD, lastGamma, MEAN_CHANGE_THRESHOLD))
                     break;
             }
 

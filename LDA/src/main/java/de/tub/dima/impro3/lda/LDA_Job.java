@@ -9,6 +9,9 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.math.DenseVector;
 import org.apache.flink.ml.math.Matrix;
 
+import java.util.HashSet;
+import java.util.Set;
+
 
 /**
  * Created by arbuzinside on 29.12.2015.
@@ -18,16 +21,24 @@ import org.apache.flink.ml.math.Matrix;
 public class LDA_Job {
 
 
+    final static Set<String> sWords = new HashSet<String>();
+
     public static void main(String[] args) throws Exception {
 
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
+
+
         String path = "src/main/resources/data.txt";
         DataSet<Tuple1<String>> rawLines = env.readCsvFile(path).lineDelimiter("\n").types(String.class);
 
-        /**
-         * TODO: set uniques ids in different way
-         */
+
+
+
+
+
+
+
         //corpus.print();
 
         DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(1);
@@ -89,6 +100,8 @@ public class LDA_Job {
             return new Tuple2<>(id, new DenseVector(lineValues));
         }
     }
+
+
 
 
 }
