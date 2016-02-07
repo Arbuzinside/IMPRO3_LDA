@@ -6,6 +6,7 @@ import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.DataSource;
+import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.utils.DataSetUtils;
@@ -33,7 +34,7 @@ public class VocabularyPrep {
         DataSource<String> input = env.readTextFile(Config.pathToTrainingSet());
 
         // read input with df-cut
-        DataSet<String> terms = input.flatMap(new DataReader());
+        DataSet<Tuple1<String>> terms = input.flatMap(new DataReader());
 
         DataSet<String> stopWords = env.readTextFile(Config.pathToStopWOrds());
 
@@ -42,10 +43,10 @@ public class VocabularyPrep {
             sWords.add(word);
 
         // conditional counter per word per label
-        DataSet<String> filteredTerms = terms.filter(new FilterWords()).distinct();
+        DataSet<Tuple1<String>> filteredTerms = terms.filter(new FilterWords()).distinct();
 
 
-        DataSet<Tuple2<Long, String>> vocabulary = DataSetUtils.zipWithUniqueId(filteredTerms).sortPartition(1, Order.ASCENDING);
+        DataSet<Tuple2<Long, Tuple1<String>>> vocabulary =DataSetUtils.zipWithUniqueId(filteredTerms).sortPartition(1, Order.ASCENDING);
 
 
         vocabulary.writeAsCsv(Config.pathToConditionals(), "\n", "\t", FileSystem.WriteMode.OVERWRITE);
@@ -61,13 +62,19 @@ public class VocabularyPrep {
 
 
 
-    public static class FilterWords implements FilterFunction<String> {
+    public static class FilterWords implements FilterFunction<Tuple1<String>> {
 
-        @Override
-        public boolean filter(String word) {
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
 
 
-            if (!sWords.contains(word) && isAlpha(word) && word.toCharArray().length > 4)
+		@Override
+        public boolean filter(Tuple1<String> word) {
+
+
+            if (!sWords.contains(word.f0) && isAlpha(word.f0) && word.f0.toCharArray().length > 4)
                 return true;
             else
                 return false;
@@ -90,16 +97,21 @@ public class VocabularyPrep {
     }
 
 
-    public static class DataReader implements FlatMapFunction<String, String> {
-        @Override
-        public void flatMap(String line, Collector<String> collector) throws Exception {
+    public static class DataReader implements FlatMapFunction<String, Tuple1<String>> {
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		@Override
+        public void flatMap(String line, Collector<Tuple1<String>> collector) throws Exception {
 
             String[] tokens = line.split("\t");
             String label = tokens[0];
             String[] terms = tokens[1].split(",");
 
             for (String term : terms) {
-                collector.collect(term);
+                collector.collect(new Tuple1<String>(term));
             }
         }
 
@@ -107,7 +119,12 @@ public class VocabularyPrep {
 
     public static class LabelCount implements FlatMapFunction<Tuple3<String, String, Long>, Tuple2<String, Long>> {
 
-        @Override
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		@Override
         public void flatMap(Tuple3<String, String, Long> input, Collector<Tuple2<String, Long>> out){
 
             out.collect(new Tuple2<String, Long>(input.f0, input.f2));
