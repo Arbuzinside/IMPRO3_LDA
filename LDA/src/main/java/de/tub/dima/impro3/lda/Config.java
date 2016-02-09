@@ -12,8 +12,8 @@ public class Config {
 //    private static final String INPUT_PATH = "src/resources/";
 //    private static final String OUTPUT_PATH = "src/results/";
 
-    private static final String INPUT_PATH = "/home/dmatar/impro/";
-   private static final String OUTPUT_PATH = "/home/dmatar/results/";
+    private static final String INPUT_PATH = "hdfs:///LDA_DATA/impro/";
+   private static final String OUTPUT_PATH = "hdfs:///LDA_DATA/";
 
 // private static final String INPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/src/test/resources/assignment2/";
     //private static final String OUTPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/output/";
@@ -28,7 +28,7 @@ public class Config {
 
 
     public static String pathToTrainingSet() {
-        return INPUT_PATH + "test.tab";
+        return INPUT_PATH + "train.tab";
 
     }
 

@@ -206,7 +206,10 @@ public class OnlineLDAOptimizer {
         }
 
         for (int i = 0; i < min; i ++){
+        	if(i< corpus.size())
             corpus.remove(i);
+        	else
+        		break;
         }
 
 

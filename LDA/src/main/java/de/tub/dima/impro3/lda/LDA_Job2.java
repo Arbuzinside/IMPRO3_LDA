@@ -18,7 +18,7 @@ import java.util.Set;
  */
 
 
-public class LDA_Job {
+public class LDA_Job2 {
 
 
     final static Set<String> sWords = new HashSet<String>();
@@ -29,8 +29,8 @@ public class LDA_Job {
 
 
 
-        String path = "data.txt";
-        DataSet<Tuple1<String>> rawLines = env.readCsvFile(path).lineDelimiter("\n").types(String.class);
+        String path = "corpus";
+        DataSet<String> rawLines = env.readTextFile(path);
 
 
 
@@ -77,22 +77,34 @@ public class LDA_Job {
     /**
      * Map parser to split lines into vectors with unique ids
      */
-    public static class DataParser implements MapFunction<Tuple1<String>, Tuple2<Long, DenseVector>> {
+    public static class DataParser implements MapFunction<String, Tuple2<Long, DenseVector>> {
 
-        private Long id;
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+		private Long id;
 
         public DataParser() {
             this.id = (long) -1;
         }
 
         @Override
-        public Tuple2<Long,DenseVector> map(Tuple1<String> s){
+        public Tuple2<Long,DenseVector> map(String s){
             id++;
-            String[] sarray = s.f0.trim().split("\\s");
-            double[] lineValues = new double[sarray.length];
+            String[] sarray = s.trim().split("\\,");
+            
+        	
+            Long key = Long.parseLong(sarray[0].replace("(", ""));
+            String[] array  = sarray[1].split("DenseVector");
+            sarray[1] =  array[1].replace("(", "");
+            
+            sarray[sarray.length-1] = sarray[sarray.length-1].replace(")", "");	 
+            
+            double[] lineValues = new double[sarray.length-1];
 
-            for(int i = 0; i < sarray.length; i++){
-                lineValues[i] = Double.parseDouble(sarray[i]);
+            for(int i = 1; i < sarray.length-1; i++){
+                lineValues[i-1] = Double.parseDouble(sarray[i]);
             }
             return new Tuple2<>(id, new DenseVector(lineValues));
         }
