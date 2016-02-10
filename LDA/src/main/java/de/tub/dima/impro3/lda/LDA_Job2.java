@@ -37,7 +37,7 @@ public class LDA_Job2 {
 
         //corpus.print();
 
-        DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(5);
+        DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(1);
 
         /**
          * Default parameters:
@@ -82,15 +82,19 @@ public class LDA_Job2 {
 		 * 
 		 */
 		private static final long serialVersionUID = 1L;
-		
+        private Long id;
+
+        public DataParser() {
+            this.id = (long) -1;
+        }
 
         @Override
         public Tuple2<Long,DenseVector> map(String s){
-      
+        	 id++;
             String[] sarray = s.trim().split(",");
             
         	
-         Long key = Long.parseLong(sarray[0].replace("(", ""));
+//         Long key = Long.parseLong(sarray[0].replace("(", ""));
             String[] array  = sarray[1].split("DenseVector");
             sarray[1] =  array[1].replace("(", "");
             
@@ -101,7 +105,7 @@ public class LDA_Job2 {
             for(int i = 1; i < sarray.length-1; i++){
                 lineValues[i-1] = Double.parseDouble(sarray[i]);
             }
-            return new Tuple2<>(key, new DenseVector(lineValues));
+            return new Tuple2<>(id, new DenseVector(lineValues));
         }
     }
 
