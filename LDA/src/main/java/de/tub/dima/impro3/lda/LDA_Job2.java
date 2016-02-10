@@ -37,7 +37,7 @@ public class LDA_Job2 {
 
         //corpus.print();
 
-        DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(1);
+        DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(10);
 
         /**
          * Default parameters:
