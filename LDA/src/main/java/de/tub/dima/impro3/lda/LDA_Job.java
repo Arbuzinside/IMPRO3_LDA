@@ -29,7 +29,7 @@ public class LDA_Job {
 
 
 
-        String path = "data.txt";
+        String path = "src/main/resources/data.txt";
         DataSet<Tuple1<String>> rawLines = env.readCsvFile(path).lineDelimiter("\n").types(String.class);
 
 

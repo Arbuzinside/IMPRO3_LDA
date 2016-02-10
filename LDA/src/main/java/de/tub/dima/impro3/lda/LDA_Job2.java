@@ -4,7 +4,6 @@ package de.tub.dima.impro3.lda;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
-import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.ml.math.DenseVector;
 import org.apache.flink.ml.math.Matrix;
@@ -29,7 +28,7 @@ public class LDA_Job2 {
 
 
 
-        String path = "corpus";
+        String path = Config.pathToCorpus();
         DataSet<String> rawLines = env.readTextFile(path);
 
 
@@ -95,7 +94,7 @@ public class LDA_Job2 {
             String[] sarray = s.trim().split("\\,");
             
         	
-            Long key = Long.parseLong(sarray[0].replace("(", ""));
+//            Long key = Long.parseLong(sarray[0].replace("(", ""));
             String[] array  = sarray[1].split("DenseVector");
             sarray[1] =  array[1].replace("(", "");
             
