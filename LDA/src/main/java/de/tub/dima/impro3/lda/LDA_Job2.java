@@ -29,7 +29,7 @@ public class LDA_Job2 {
 
 
         String path = Config.pathToCorpus();
-        DataSet<String> rawLines = env.readTextFile(path);
+        DataSet<String> rawLines = env.readTextFile(path).setParallelism(1);
 
 
 
