@@ -37,7 +37,7 @@ public class LDA_Job2 {
 
         //corpus.print();
 
-        DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(10);
+        DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser()).setParallelism(5);
 
         /**
          * Default parameters:
@@ -87,7 +87,7 @@ public class LDA_Job2 {
         @Override
         public Tuple2<Long,DenseVector> map(String s){
       
-            String[] sarray = s.trim().split("\\,");
+            String[] sarray = s.trim().split(",");
             
         	
          Long key = Long.parseLong(sarray[0].replace("(", ""));
