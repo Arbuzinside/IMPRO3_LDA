@@ -12,8 +12,8 @@ import org.apache.spark.SparkConf;
 
 public class SparkLDA {
 	 public static void main(String[] args) {
-  //  SparkConf conf = new SparkConf().setAppName("LDA SPARK").setMaster("local").set("spark.ui.port", "4050");
-				 SparkConf conf = new SparkConf().setAppName("LDA SPARK").set("spark.ui.port", "4050");  
+ 	 //  SparkConf conf = new SparkConf().setAppName("LDA SPARK").setMaster("local").set("spark.ui.port", "4050");
+			 SparkConf conf = new SparkConf().setAppName("LDA SPARK").set("spark.ui.port", "4050");  
 		 @SuppressWarnings("resource")
 			JavaSparkContext sc = new JavaSparkContext(conf);
 
