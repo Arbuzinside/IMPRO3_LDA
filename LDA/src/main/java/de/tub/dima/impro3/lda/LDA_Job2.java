@@ -91,7 +91,7 @@ public class LDA_Job2 {
         @Override
         public Tuple2<Long,DenseVector> map(String s){
         	 id++;
-            String[] sarray = s.trim().split(",");
+            String[] sarray = s.trim().split("\\,");
             
         	
 //         Long key = Long.parseLong(sarray[0].replace("(", ""));
