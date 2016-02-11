@@ -27,8 +27,7 @@ public class SparkLDA {
 			JavaSparkContext sc = new JavaSparkContext(conf);
 
 		    // Load and parse the data
-     	    String path = "hdfs:///LDA_DATA/corpus";
-//		    String path = "corpus";
+     	    String path = args[0];
 		    JavaRDD<String> data = sc.textFile(path);
 		    JavaRDD<Tuple2<Long, Vector>> parsedData = data.map(
 		        new Function<String,  Tuple2<Long, Vector>>() {
@@ -94,7 +93,7 @@ public class SparkLDA {
 		      }
 		    }
 		    
-		  sc.parallelize(list).saveAsTextFile("hdfs:///LDA_DATA/sparkMatrix");	    
+		  sc.parallelize(list).saveAsTextFile(args[1]);	    
 		    sc.stop();
 		  }
 	 
