@@ -70,7 +70,7 @@ public class DocToVec {
 
 
 
-        DataSet<Tuple2<String, String>> ldasrc = env.readCsvFile(Config.pathToTestSet())
+        DataSet<Tuple2<String, String>> ldasrc = env.readCsvFile(Config.pathToWikiResults())
                 .fieldDelimiter("\t")
                 .ignoreInvalidLines()
                 .types(String.class, String.class)
@@ -103,7 +103,12 @@ public class DocToVec {
     public static class docToVector extends RichFlatMapFunction<Tuple2<Long, Tuple2<String, String>>, Tuple2<Long, DenseVector>> {
 
 
-        private  HashSet<String> sWords;
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
+		private  HashSet<String> sWords;
 
         private  Map<Long,String> vocab;
 

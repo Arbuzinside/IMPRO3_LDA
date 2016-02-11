@@ -12,7 +12,7 @@ public class Config {
 //    private static final String INPUT_PATH = "src/resources/";
 //    private static final String OUTPUT_PATH = "src/results/";
 
-    private static final String INPUT_PATH = "hdfs:///LDA_DATA/data2/";
+    private static final String INPUT_PATH = "hdfs:///LDA_DATA/";
    private static final String OUTPUT_PATH = "hdfs:///LDA_DATA/";
 
 // private static final String INPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/src/test/resources/assignment2/";
