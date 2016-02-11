@@ -1,5 +1,7 @@
 package spark;
+import scala.Function1;
 import scala.Tuple2;
+import scala.Tuple3;
 
 import org.apache.spark.api.java.*;
 import org.apache.spark.api.java.function.Function;
@@ -8,17 +10,25 @@ import org.apache.spark.mllib.clustering.LDA;
 import org.apache.spark.mllib.linalg.Matrix;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.Vectors;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map.Entry;
+
 import org.apache.spark.SparkConf;
+import org.apache.spark.SparkContext;
 
 public class SparkLDA {
 	 public static void main(String[] args) {
- 	 //  SparkConf conf = new SparkConf().setAppName("LDA SPARK").setMaster("local").set("spark.ui.port", "4050");
-			 SparkConf conf = new SparkConf().setAppName("LDA SPARK").set("spark.ui.port", "4050");  
+ 	 SparkConf conf = new SparkConf().setAppName("LDA SPARK").setMaster("local");
+		 // 	 SparkConf conf = new SparkConf().setAppName("LDA SPARK");
 		 @SuppressWarnings("resource")
 			JavaSparkContext sc = new JavaSparkContext(conf);
 
 		    // Load and parse the data
-		    String path = "hdfs:///LDA_DATA/corpus";
+//		    String path = "hdfs:///LDA_DATA/corpus";
+		    String path = "corpus";
 		    JavaRDD<String> data = sc.textFile(path);
 		    JavaRDD<Tuple2<Long, Vector>> parsedData = data.map(
 		        new Function<String,  Tuple2<Long, Vector>>() {
@@ -59,22 +69,33 @@ public class SparkLDA {
 		        }
 		    ));
 		    corpus.cache();
+		    int k = 3;
 
 		    // Cluster the documents into three topics using LDA
-		    DistributedLDAModel ldaModel = (DistributedLDAModel)new LDA().setK(3).run(corpus);
+		    DistributedLDAModel ldaModel = (DistributedLDAModel)new LDA().setK(k).run(corpus);
 
 		    // Output topics. Each is a distribution over words (matching word count vectors)
 		    System.out.println("Learned topics (as distributions over vocab of " + ldaModel.vocabSize()
 		        + " words):");
-		    
 		    Matrix topics = ldaModel.topicsMatrix();
-		    for (int topic = 0; topic < 3; topic++) {
-		      System.out.print("Topic " + topic + ":");
+				   
+		   List< Tuple3<Integer,Integer, Double>> list = new ArrayList< Tuple3<Integer,Integer, Double>>();
+		   
+		    for (int topic = 0; topic < k; topic++) {
+//		      System.out.print("Topic " + topic + ":");
 		      for (int word = 0; word < ldaModel.vocabSize(); word++) {
-		        System.out.print(" " + topics.apply(word, topic));
+		       double v = topics.apply(word, topic);
+		       if (v!= 0.0) {
+		    	   list.add(new Tuple3<Integer,Integer, Double>(topic,word,v));
+//		    	   System.out.println(topic + " ///////"+ word + "_____"+v);
+		    	   
+		       }
+		    	 
 		      }
-		      System.out.println();
 		    }
+		    
+		  sc.parallelize(list).saveAsTextFile("sparkMatrix");	    
 		    sc.stop();
 		  }
+	 
 }
