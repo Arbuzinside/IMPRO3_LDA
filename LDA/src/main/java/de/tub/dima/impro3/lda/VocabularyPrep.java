@@ -29,7 +29,7 @@ public class VocabularyPrep {
     private final static Set<String> sWords = new HashSet<String>();
 
 
-    private final static int wordLength = 3;
+    private final static int wordLength = 4;
 
     public static void main(String[] args) throws Exception {
 
@@ -54,10 +54,10 @@ public class VocabularyPrep {
         DataSet<Set<String>> broadcastSW = ExecutionEnvironment.getExecutionEnvironment().fromElements(sWords);
 
         // conditional counter per word per label
-        DataSet<Tuple1<String>> filteredTerms = terms.flatMap(new FilterWords()) .withBroadcastSet(broadcastSW, "broadcastSW").distinct();
+        DataSet<Tuple2<String, Integer>> filteredTerms = terms.flatMap(new FilterWords()) .withBroadcastSet(broadcastSW, "broadcastSW").groupBy(0).sum(1).distinct();
 
 
-        DataSet<Tuple2<Long, Tuple1<String>>> vocabulary =DataSetUtils.zipWithUniqueId(filteredTerms).sortPartition(1, Order.ASCENDING);
+        DataSet<Tuple2<Long, Tuple2<String, Integer>>> vocabulary =DataSetUtils.zipWithUniqueId(filteredTerms).sortPartition(1, Order.ASCENDING);
 
 
         vocabulary.writeAsCsv(Config.pathToConditionals(), "\n", "\t", FileSystem.WriteMode.OVERWRITE);
@@ -73,7 +73,7 @@ public class VocabularyPrep {
 
 
 
-    public static class FilterWords extends  RichFlatMapFunction<Tuple1<String>,Tuple1<String>> {
+    public static class FilterWords extends  RichFlatMapFunction<Tuple1<String>,Tuple2<String, Integer>> {
 
         /**
 		 * 
@@ -94,14 +94,14 @@ public class VocabularyPrep {
         }
         
         
-        public void flatMap(Tuple1<String> word, Collector<Tuple1<String>> collector) throws Exception {
+        public void flatMap(Tuple1<String> word, Collector<Tuple2<String, Integer>> collector) throws Exception {
 
         	
         	 if (!sWords.contains(word.f0) && isAlpha(word.f0) && word.f0.toCharArray().length > wordLength)
         	 {
         		 
 
-                 collector.collect(new Tuple1<String>(word.f0));
+                 collector.collect(new Tuple2<String, Integer>(word.f0,1));
         		 
         }
         }
@@ -137,6 +137,7 @@ public class VocabularyPrep {
             String[] terms = tokens[1].split(",");
 
             for (String term : terms) {
+            	term=	term.toLowerCase().trim();
                 collector.collect(new Tuple1<String>(term));
             }
         }
