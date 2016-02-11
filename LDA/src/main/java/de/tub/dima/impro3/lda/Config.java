@@ -4,16 +4,16 @@ package de.tub.dima.impro3.lda;
  * Created by arbuzinside on 7.2.2016.
  */
 public class Config {
-
-    private static final String INPUT_PATH = "";
-    private static final String OUTPUT_PATH = "";
+//
+//    private static final String INPUT_PATH = "";
+//    private static final String OUTPUT_PATH = "";
     
 //
 //    private static final String INPUT_PATH = "src/resources/";
 //    private static final String OUTPUT_PATH = "src/results/";
 
-//    private static final String INPUT_PATH = "hdfs:///LDA_DATA/impro/";
-//   private static final String OUTPUT_PATH = "hdfs:///LDA_DATA/";
+    private static final String INPUT_PATH = "hdfs:///LDA_DATA/data2/";
+   private static final String OUTPUT_PATH = "hdfs:///LDA_DATA/";
 
 // private static final String INPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/src/test/resources/assignment2/";
     //private static final String OUTPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/output/";
@@ -69,5 +69,11 @@ public class Config {
         return OUTPUT_PATH + "sparkResult";
     }
     
-
+    public static String pathToWikiPages() {
+        return OUTPUT_PATH + "wiki";
+    }
+    
+    public static String pathToWikiResults() {
+        return OUTPUT_PATH + "wikiResult";
+    }
 }

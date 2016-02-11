@@ -38,7 +38,7 @@ public class VocabularyPrep {
 
         env.setParallelism(1);
 
-        DataSource<String> input = env.readTextFile(Config.pathToTrainingSet());
+        DataSource<String> input = env.readTextFile(Config.pathToWikiResults());
 
         // read input with df-cut
         DataSet<Tuple1<String>> terms = input.flatMap(new DataReader());
