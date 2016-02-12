@@ -28,13 +28,11 @@ public class MatrixParser {
 
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
         
-        env.setParallelism(1);
         
-        
-        DataSource<String> data = env.readTextFile(Config.pathToSparkMatrix());
+        DataSource<String> data = env.readTextFile(args[0]);
         DataSet<Tuple3<Integer,Integer, Double>> input =  data.flatMap(new DataReader());
         
-        DataSet<Tuple2<Integer, String>> vocabulaty = env.readCsvFile(Config.pathToConditionals())
+        DataSet<Tuple2<Integer, String>> vocabulaty = env.readCsvFile(args[1])
                 .fieldDelimiter("\t")
                 .lineDelimiter("\n")
                 .types(Integer.class, String.class);
@@ -43,7 +41,7 @@ public class MatrixParser {
          
           SortPartitionOperator<Tuple> result = join.sortPartition(0, Order.ASCENDING).sortPartition(2, Order.DESCENDING);
 
-          result.writeAsCsv(Config.pathToOutSpark(), "\n", "\t", FileSystem.WriteMode.OVERWRITE);
+          result.writeAsCsv(args[3], "\n", "\t", FileSystem.WriteMode.OVERWRITE);
 
 
 
