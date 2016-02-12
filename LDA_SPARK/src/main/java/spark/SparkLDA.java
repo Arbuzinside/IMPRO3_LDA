@@ -68,7 +68,7 @@ public class SparkLDA {
 		        }
 		    ));
 		    corpus.cache();
-		    int k = 3;
+		    int k = Integer.parseInt(args[2]);
 
 		    // Cluster the documents into three topics using LDA
 		    DistributedLDAModel ldaModel = (DistributedLDAModel)new LDA().setK(k).run(corpus);
