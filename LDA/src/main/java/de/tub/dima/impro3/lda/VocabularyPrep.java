@@ -1,7 +1,9 @@
 package de.tub.dima.impro3.lda;
 
-import org.apache.flink.api.common.functions.FilterFunction;
+
 import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
+ 
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -10,10 +12,13 @@ import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.utils.DataSetUtils;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.FileSystem;
+ 
 import org.apache.flink.util.Collector;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -24,7 +29,7 @@ public class VocabularyPrep {
     private final static Set<String> sWords = new HashSet<String>();
 
 
-    private final static int wordLength = 3;
+    private final static int wordLength = 4;
 
     public static void main(String[] args) throws Exception {
 
@@ -33,22 +38,26 @@ public class VocabularyPrep {
 
         env.setParallelism(1);
 
-        DataSource<String> input = env.readTextFile(Config.pathToTrainingSet());
+        DataSource<String> input = env.readTextFile(Config.pathToWikiResults());
 
         // read input with df-cut
         DataSet<Tuple1<String>> terms = input.flatMap(new DataReader());
 
-        DataSet<String> stopWords = env.readTextFile(Config.pathToStopWOrds());
+        DataSet<Tuple1<String>> stopWords = env.readCsvFile(Config.pathToStopWOrds())   .lineDelimiter("\n")
+                .types(String.class);
 
-        String[] words = stopWords.toString().split("\\n");
-        for (String word: words)
-            sWords.add(word);
+       List<Tuple1<String>>   slist =   stopWords.collect();
+     
+        for (Tuple1<String> word: slist)
+            sWords.add(word.f0);
+        
+        DataSet<Set<String>> broadcastSW = ExecutionEnvironment.getExecutionEnvironment().fromElements(sWords);
 
         // conditional counter per word per label
-        DataSet<Tuple1<String>> filteredTerms = terms.filter(new FilterWords()).distinct();
+        DataSet<Tuple2<String, Integer>> filteredTerms = terms.flatMap(new FilterWords()) .withBroadcastSet(broadcastSW, "broadcastSW").groupBy(0).sum(1).distinct();
 
 
-        DataSet<Tuple2<Long, Tuple1<String>>> vocabulary =DataSetUtils.zipWithUniqueId(filteredTerms).sortPartition(1, Order.ASCENDING);
+        DataSet<Tuple2<Long, Tuple2<String, Integer>>> vocabulary =DataSetUtils.zipWithUniqueId(filteredTerms).sortPartition(1, Order.ASCENDING);
 
 
         vocabulary.writeAsCsv(Config.pathToConditionals(), "\n", "\t", FileSystem.WriteMode.OVERWRITE);
@@ -64,7 +73,7 @@ public class VocabularyPrep {
 
 
 
-    public static class FilterWords implements FilterFunction<Tuple1<String>> {
+    public static class FilterWords extends  RichFlatMapFunction<Tuple1<String>,Tuple2<String, Integer>> {
 
         /**
 		 * 
@@ -74,17 +83,29 @@ public class VocabularyPrep {
 
 
 
-
-		@Override
-        public boolean filter(Tuple1<String> word) {
+        private  HashSet<String> sWords;
 
 
-            if (!sWords.contains(word) && isAlpha(word.f0) && word.f0.toCharArray().length > wordLength)
-                return true;
-            else
-                return false;
+        public void open(Configuration parameters) {
 
+
+            List<HashSet<String>> bsw  =  getRuntimeContext().getBroadcastVariable("broadcastSW");
+            sWords = bsw.get(0);
         }
+        
+        
+        public void flatMap(Tuple1<String> word, Collector<Tuple2<String, Integer>> collector) throws Exception {
+
+        	
+        	 if (!sWords.contains(word.f0) && isAlpha(word.f0) && word.f0.toCharArray().length > wordLength)
+        	 {
+        		 
+
+                 collector.collect(new Tuple2<String, Integer>(word.f0,1));
+        		 
+        }
+        }
+        
 
 
         public boolean isAlpha(String name) {
@@ -112,10 +133,11 @@ public class VocabularyPrep {
         public void flatMap(String line, Collector<Tuple1<String>> collector) throws Exception {
 
             String[] tokens = line.split("\t");
-            String label = tokens[0];
+//            String label = tokens[0];
             String[] terms = tokens[1].split(",");
 
             for (String term : terms) {
+            	term=	term.toLowerCase().trim();
                 collector.collect(new Tuple1<String>(term));
             }
         }

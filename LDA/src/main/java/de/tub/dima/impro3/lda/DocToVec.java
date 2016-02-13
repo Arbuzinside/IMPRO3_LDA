@@ -5,6 +5,7 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.utils.DataSetUtils;
@@ -14,6 +15,7 @@ import org.apache.flink.ml.math.DenseVector;
 import org.apache.flink.util.Collector;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +28,7 @@ public class DocToVec {
 
     private final static Set<String> sWords = new HashSet<String>();
 
-    private static HashMap<String, Long> vocab;
+    private static HashMap<Long,String> vocab;
 
     private final static int wordLength = 3;
 
@@ -37,11 +39,13 @@ public class DocToVec {
 
 
 
-        DataSet<String> stopWords = env.readTextFile(Config.pathToStopWOrds());
+        DataSet<Tuple1<String>> stopWords = env.readCsvFile(Config.pathToStopWOrds())   .lineDelimiter("\n")
+                .types(String.class);
 
-        String[] words = stopWords.toString().split("\\n");
-        for (String word: words)
-            sWords.add(word);
+       List<Tuple1<String>>   slist =   stopWords.collect();
+     
+        for (Tuple1<String> word: slist)
+            sWords.add(word.f0);
 
 
         DataSet<Tuple2<Long, String>> vocabulaty = env.readCsvFile(Config.pathToConditionals())
@@ -51,22 +55,22 @@ public class DocToVec {
 
 
 
-         List vocList = vocabulaty.project(1, 0).collect();
+         List vocList = vocabulaty.collect();
 
-        ArrayList<Tuple2<String, Long>> v = new ArrayList<>(vocList);
+        ArrayList<Tuple2<Long,String>> v = new ArrayList<>(vocList);
 
 
         vocab = listToMap(v);
 
 
 
-        DataSet<HashMap<String, Long>> broadcastV = ExecutionEnvironment.getExecutionEnvironment().fromElements(vocab);
+        DataSet<HashMap< Long,String>> broadcastV = ExecutionEnvironment.getExecutionEnvironment().fromElements(vocab);
         DataSet<Set<String>> broadcastSW = ExecutionEnvironment.getExecutionEnvironment().fromElements(sWords);
 
 
 
 
-        DataSet<Tuple2<String, String>> ldasrc = env.readCsvFile(Config.pathToTestSet())
+        DataSet<Tuple2<String, String>> ldasrc = env.readCsvFile(Config.pathToWikiResults())
                 .fieldDelimiter("\t")
                 .ignoreInvalidLines()
                 .types(String.class, String.class)
@@ -99,9 +103,14 @@ public class DocToVec {
     public static class docToVector extends RichFlatMapFunction<Tuple2<Long, Tuple2<String, String>>, Tuple2<Long, DenseVector>> {
 
 
-        private  HashSet<String> sWords;
+        /**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
 
-        private  Map<String, Long> vocab;
+		private  HashSet<String> sWords;
+
+        private  Map<Long,String> vocab;
 
 
 
@@ -109,7 +118,7 @@ public class DocToVec {
 
         public void open(Configuration parameters) {
 
-            List<HashMap<String, Long>> bv  =  getRuntimeContext().getBroadcastVariable("broadcastV");
+            List<HashMap<Long,String>> bv  =  getRuntimeContext().getBroadcastVariable("broadcastV");
             this.vocab = bv.get(0);
 
 
@@ -149,13 +158,20 @@ public class DocToVec {
 
             for(String word: docWordCount.keySet()){
 
-                if (!vocab.containsKey(word))
+            	
+                for (Entry<Long, String> entry : vocab.entrySet()) {
+                	
+                	String sWord = entry.getValue().replace("(", "").replace(")", "");
+                    if (word.equals(sWord)) {
+                    	 long index = entry.getKey();
+                                 double count = (double) docWordCount.get(word);
+                                 output.update((int) index, count);
+                        
+                    }}
+                if (!vocab.containsValue(word))
                     continue;
-                long index = vocab.get(word);
-                double count = (double) docWordCount.get(word);
-                output.update((int) index, count);
+               
             }
-
 
 
 
@@ -168,13 +184,13 @@ public class DocToVec {
 
 
 
-    public static HashMap listToMap(ArrayList<Tuple2<String, Long>> vocab){
+    public static HashMap listToMap(ArrayList<Tuple2< Long,String>> vocab){
 
 
-        HashMap<String, Long> words = new HashMap<>();
+        HashMap<Long,String> words = new HashMap<>();
 
 
-        for(Tuple2<String, Long> tuple: vocab){
+        for(Tuple2<Long,String> tuple: vocab){
 
             words.put(tuple.f0, tuple.f1);
 
