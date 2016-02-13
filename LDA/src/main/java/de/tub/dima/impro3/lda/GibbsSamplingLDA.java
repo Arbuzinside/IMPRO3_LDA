@@ -39,11 +39,11 @@ package de.tub.dima.impro3.lda;
 
 public class GibbsSamplingLDA {
 
-    public static final String documents_path = "/tmp/ldasrc.csv";
+    public static final String documents_path = "/tmp/test.tab";
     public static final String pathTopicDistOnDoc = "/tmp/out/topicDistOnDoc";
     public static final String pathWordDistOnTopic = "/tmp/out/wordDistOnTopic";
-    public static final int kTopic = 5;
-    public static final double maxIter = 10;
+    public static final int kTopic = 20;
+    public static final double maxIter = 100;
     public static final double alpha = 0.45;
     public static final double beta = 0.01;
     public static Integer[][] nkv;
@@ -57,14 +57,21 @@ public class GibbsSamplingLDA {
 
 
         //Step2, read files into HDFS
-        // ldasrc = DataSet<Tuple2<documentID, array of words in the document>>
-        DataSet<Tuple2<Long,String[]>> ldasrc = env.readCsvFile(documents_path)
-                .lineDelimiter("\n")
-                .fieldDelimiter("\t")
-                .ignoreInvalidLines()
-                .types(Long.class, String.class)
-                .filter(new LdaSrcFileFilter())
-                .map(new LdaSrcFileMapper());
+	// ldasrcFile = DataSet<Tuple1<array of words in the document>>
+	DataSet<Tuple1<String[]>> ldasrcFile = env.readCsvFile(documents_path)
+						.lineDelimiter("\n")
+						.fieldDelimiter("\t")
+						.ignoreInvalidLines()
+						.includeFields("01")
+						.types(String.class)
+						.filter(new LdaSrcFileFilter())
+						.map(new LdaSrcFileMapper());
+
+	// ldasrc0 = DataSet<Tuple2<documentID,Tuple1<array of words>>>
+	DataSet<Tuple2<Long,Tuple1<String[]>>> ldasrc0 = DataSetUtils.zipWithUniqueId(ldasrcFile);
+	
+	// ldasrc = DataSet<Tuple2<documentID,array of words>>
+	DataSet<Tuple2<Long,String[]>> ldasrc = ldasrc0.map(new LdaSrcWithUniqueIdFileMapper());
 
         //Step3, build a dictionary for alphabet: wordIndexMap
         // dictionary = DataSet<Tuple2<word,1>>, non-duplicate alphabetical sorted list of words
@@ -303,21 +310,31 @@ public class GibbsSamplingLDA {
     }
 
     @SuppressWarnings("serial")
-    private static class LdaSrcFileFilter implements FilterFunction<Tuple2<Long, String>> {
-        @Override
-        public boolean filter(Tuple2<Long, String> tuple) throws Exception {
-            return !tuple.f1.isEmpty() && tuple.f1.length() > 0;
-        }
-    }
+	private static class LdaSrcFileFilter implements FilterFunction<Tuple1<String>> {
+		@Override
+		public boolean filter(Tuple1<String> tuple) throws Exception {
+			return !tuple.f0.isEmpty() && tuple.f0.length() > 0;
+		}
+	}
+	
+	@SuppressWarnings("serial")
+	// INPUT : "content"
+	// OUTPUT: "array_of_words"
+	private static class LdaSrcFileMapper implements MapFunction<Tuple1<String>, Tuple1<String[]>> {
+		@Override
+		public Tuple1<String[]> map(Tuple1<String> arg0) throws Exception {
+			return new Tuple1<String[]>(arg0.f0.split(","));			
+		}
+	}
 
-    @SuppressWarnings("serial")
-    // INPUT : "document_id, content"
-    // OUTPUT: "document_id, array_of_words"
-    private static class LdaSrcFileMapper implements MapFunction<Tuple2<Long, String>, Tuple2<Long, String[]>> {
-        @Override
-        public Tuple2<Long, String[]> map(Tuple2<Long, String> arg0) throws Exception {
-            return new Tuple2<Long, String[]>(arg0.f0, arg0.f1.split(" "));
-        }
-    }
+	@SuppressWarnings("serial")
+	// INPUT : "document_id, Tuple1<array_of_words>"
+	// OUTPUT: "document_id, array_of_words"
+	private static class LdaSrcWithUniqueIdFileMapper implements MapFunction<Tuple2<Long,Tuple1<String[]>>, Tuple2<Long,String[]>> {
+		@Override
+		public Tuple2<Long, String[]> map(Tuple2<Long, Tuple1<String[]>> arg0) throws Exception {
+			return new Tuple2<Long, String[]>(arg0.f0,arg0.f1.f0);
+		}
+	}
 
 }
