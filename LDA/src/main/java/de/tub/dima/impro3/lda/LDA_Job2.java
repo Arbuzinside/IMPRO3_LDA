@@ -48,37 +48,36 @@ public class LDA_Job2 {
 //         *
 //         */
 //
-//        int numberOfTopics = Integer.parseInt(args[2]);
-//
-//
-//        LDAModel ldaModel = new LDA().setK(3).run(corpus);
-//
-//        // Output topics. Each is a distribution over words (matching word count vectors)
-////        System.out.println("Learned topics (as distributions over vocab of " + ldaModel.vocabSize()
-////                + " words):");
-//        Matrix topics = ldaModel.getTopics();
-//      
-//        List< Tuple3<Integer,Integer, Double>> list = new ArrayList< Tuple3<Integer,Integer, Double>>();
-//		   
-//	    for (int topic = 0; topic < numberOfTopics; topic++) {
-// 
-//	      for (int word = 0; word < ldaModel.vocabSize(); word++) {
-//	       double v = topics.apply( topic,word);
-//	      
-//	       if (v!= 0.0) {
-//	    	   list.add(new Tuple3<Integer,Integer, Double>(topic,word,v));
-// 
-//	       }
-//	    	 
-//	      }
-//	    }
-//
-// 
-// 
-//	    
-//	    DataSet<Tuple3<Integer, Integer, Double>> ds = env.fromCollection(list);
-//	    ds.writeAsText( args[1]);
-        corpus.print();
+        int numberOfTopics = Integer.parseInt(args[2]);
+
+
+        LDAModel ldaModel = new LDA().setK(3).run(corpus);
+
+        // Output topics. Each is a distribution over words (matching word count vectors)
+//        System.out.println("Learned topics (as distributions over vocab of " + ldaModel.vocabSize()
+//                + " words):");
+        Matrix topics = ldaModel.getTopics();
+      
+        List< Tuple3<Integer,Integer, Double>> list = new ArrayList< Tuple3<Integer,Integer, Double>>();
+		   
+	    for (int topic = 0; topic < numberOfTopics; topic++) {
+ 
+	      for (int word = 0; word < ldaModel.vocabSize(); word++) {
+	       double v = topics.apply( topic,word);
+	      
+	       if (v!= 0.0) {
+	    	   list.add(new Tuple3<Integer,Integer, Double>(topic,word,v));
+ 
+	       }
+	    	 
+	      }
+	    }
+
+ 
+ 
+	    
+	    DataSet<Tuple3<Integer, Integer, Double>> ds = env.fromCollection(list);
+	    ds.writeAsText( args[1]);
 	 
        env.execute("LDA Test");
     }
