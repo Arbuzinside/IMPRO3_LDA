@@ -17,25 +17,25 @@ package de.tub.dima.impro3.lda;
  * limitations under the License.
  */
 
-        import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.common.functions.FilterFunction;
+import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.operators.Order;
+import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.tuple.Tuple1;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.utils.DataSetUtils;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.fs.FileSystem.WriteMode;
+import org.apache.flink.util.Collector;
 
-        import org.apache.flink.api.java.DataSet;
-        import org.apache.flink.api.java.tuple.Tuple2;
-        import org.apache.flink.api.java.tuple.Tuple3;
-        import org.apache.flink.configuration.Configuration;
-        import org.apache.flink.core.fs.FileSystem.WriteMode;
-        import org.apache.flink.util.Collector;
-
-        import org.apache.flink.api.common.functions.MapFunction;
-        import org.apache.flink.api.common.functions.RichMapFunction;
-        import org.apache.flink.api.common.functions.FilterFunction;
-        import org.apache.flink.api.common.functions.FlatMapFunction;
-        import org.apache.flink.api.common.operators.Order;
-
-        import java.util.ArrayList;
-        import java.util.HashMap;
-        import java.util.List;
-        import java.util.Random;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
 
 public class GibbsSamplingLDA {
 

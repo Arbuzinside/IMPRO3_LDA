@@ -51,7 +51,7 @@ public class LDA_Job2 {
         int numberOfTopics = Integer.parseInt(args[2]);
 
 
-        LDAModel ldaModel = new LDA().setK(3).run(corpus);
+        LDAModel ldaModel = new LDA().setK(numberOfTopics).run(corpus);
 
         // Output topics. Each is a distribution over words (matching word count vectors)
 //        System.out.println("Learned topics (as distributions over vocab of " + ldaModel.vocabSize()
@@ -73,8 +73,6 @@ public class LDA_Job2 {
 	      }
 	    }
 
- 
- 
 	    
 	    DataSet<Tuple3<Integer, Integer, Double>> ds = env.fromCollection(list);
 	    ds.writeAsText( args[1]);

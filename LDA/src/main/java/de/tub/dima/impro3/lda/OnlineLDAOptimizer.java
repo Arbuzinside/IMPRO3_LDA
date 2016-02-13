@@ -15,6 +15,7 @@ import org.apache.flink.api.common.functions.RichMapPartitionFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.utils.DataSetUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.ml.math.DenseMatrix;
 import org.apache.flink.ml.math.DenseVector;
@@ -259,14 +260,10 @@ public class OnlineLDAOptimizer {
 
 
         DenseMatrix eLogTheta =   LDAUtils.dirichletExpectation(this.lambda);
-
-
         DenseMatrix expELogBeta = LDAUtils.exp(eLogTheta);
-
         DenseMatrix expELogBetaTr = LDAUtils.transpose(expELogBeta);
-
-
         DataSet<DenseMatrix> broadcast = ExecutionEnvironment.getExecutionEnvironment().fromElements(expELogBetaTr);
+
         double alpha = this.alpha;
         //variational parameter over documents x topics
         //parameters over documents x topics
@@ -276,7 +273,9 @@ public class OnlineLDAOptimizer {
         DataSet<Tuple2<Long, DenseVector>> filteredDocs = batch.filter(new docFilter());
 
         //provide local index to the docs
-        DataSet<Tuple2<Long, Tuple2<Long, DenseVector>>> localBatchIndex =  filteredDocs.map(new batchIndex()).setParallelism(1);
+
+
+        DataSet<Tuple2<Long, Tuple2<Long, DenseVector>>> localBatchIndex = DataSetUtils.zipWithUniqueId(filteredDocs);
 
 
         //prepare common parameters
@@ -347,7 +346,6 @@ public class OnlineLDAOptimizer {
         DenseMatrix b = LDAUtils.addToMatrix(LDAUtils.product(stat,(double)corpusSize/batchSize), this.eta);
 
         b = LDAUtils.product(b, weight);
-
         this.lambda = LDAUtils.sum(a,b);
 
 
