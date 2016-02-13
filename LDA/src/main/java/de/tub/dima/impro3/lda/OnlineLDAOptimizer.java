@@ -74,7 +74,7 @@ public class OnlineLDAOptimizer {
      *
      * Default: 0.05, i.e., 5% of total documents.
      */
-    private double miniBatchFraction = 0.15;
+    private double miniBatchFraction = 0.05;
     private int batchCount;
     //document concentration
     private  double alpha;
@@ -150,7 +150,7 @@ public class OnlineLDAOptimizer {
 
 
             this.batchSize = (int) Math.round(docs.count() * miniBatchFraction);
-            this.corpus = docs.collect();
+          //  this.corpus = docs.collect();
 
             // Initialize the variational distribution q(beta|lambda)
             randomGenerator = new Random(lda.getSeed());
@@ -193,40 +193,13 @@ public class OnlineLDAOptimizer {
 
 
 
-
-        int cSize = corpus.size();
-        int min = 0;
-        min = Math.min(batchSize, cSize);
-
-
-        ArrayList<Tuple2<Long, DenseVector>> b = new ArrayList<>();
-
-
-        for (int i = 0; i < min; i ++){
-            b.add(corpus.get(i));
-        }
-
-        for (int i = 0; i < min; i ++){
-        	if(i< corpus.size())
-            corpus.remove(i);
-        	else
-        		break;
-        }
-
-
-
-        if (b.isEmpty())
-            return  this;
-
-
-        DataSet<Tuple2<Long, DenseVector>> batch = ExecutionEnvironment
-                                                        .getExecutionEnvironment()
-                                                        .fromCollection(b);
-
-
-
+        DataSet<Tuple2<Long, DenseVector>> batch =  DataSetUtils.sample(docs, true, miniBatchFraction, randomGenerator.nextLong());
 
         try {
+
+            if (batch.collect().isEmpty())
+                return  this;
+
             return this.submitMiniBatch(batch);
         } catch (Exception e) {
             e.printStackTrace();
@@ -253,7 +226,6 @@ public class OnlineLDAOptimizer {
 
         this.iteration += 1;
         int vocabSize = this.vocabSize;
-
 
 
 
@@ -518,12 +490,8 @@ public class OnlineLDAOptimizer {
                 iterations++;
             }
 
-
-
             DenseVector temp = LDAUtils.divideVectors(new DenseVector(cts),  phiNorm);
             DenseMatrix sstatsD =  LDAUtils.outer(expELogThetaD, temp);
-
-
 
             return new Tuple2<>(gammaD, sstatsD);
         }
