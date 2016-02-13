@@ -36,7 +36,7 @@ public class LDA_Job2 {
         String path = args[0];
         DataSet<String> rawLines = env.readTextFile(path);
 
-        DataSet<Tuple2<Long, DenseVector>> corpus =  rawLines.map(new DataParser()).setParallelism(1);
+        DataSet<Tuple2<Long, DenseVector>> corpus =  rawLines.map(new DataParser());
  
 //        /**
 //         * Default parameters:
