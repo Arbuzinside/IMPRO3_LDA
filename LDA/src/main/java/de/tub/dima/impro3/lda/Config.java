@@ -9,11 +9,11 @@ public class Config {
 //    private static final String OUTPUT_PATH = "";
     
 //
-//    private static final String INPUT_PATH = "src/resources/";
-//    private static final String OUTPUT_PATH = "src/results/";
+    private static final String INPUT_PATH = "src/resources/";
+    private static final String OUTPUT_PATH = "src/results/";
 
-    private static final String INPUT_PATH = "hdfs:///LDA_DATA/wikiDataSet4/";
-   private static final String OUTPUT_PATH = "hdfs:///LDA_DATA/wikiDataSet4/";
+  //  private static final String INPUT_PATH = "hdfs:///LDA_DATA/wikiDataSet4/";
+   //private static final String OUTPUT_PATH = "hdfs:///LDA_DATA/wikiDataSet4/";
 
 // private static final String INPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/src/test/resources/assignment2/";
     //private static final String OUTPUT_PATH = "/home/arbuzinside/workspace/assignments/Assignmnet2/classification/output/";

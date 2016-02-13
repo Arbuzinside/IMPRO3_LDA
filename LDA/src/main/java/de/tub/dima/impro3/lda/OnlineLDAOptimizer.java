@@ -31,7 +31,7 @@ public class OnlineLDAOptimizer {
 
 
     public final static double MEAN_CHANGE_THRESHOLD = 1e-3;
-    public final static int NUM_ITERATIONS = 200;
+    public final static int NUM_ITERATIONS = 100;
 
     private static Random randomGenerator;
 
@@ -342,6 +342,7 @@ public class OnlineLDAOptimizer {
         double weight = countRho();
 
 
+
         DenseMatrix a = LDAUtils.product(lambda, 1 - weight);
         DenseMatrix b = LDAUtils.addToMatrix(LDAUtils.product(stat,(double)corpusSize/batchSize), this.eta);
 
@@ -430,7 +431,7 @@ public class OnlineLDAOptimizer {
                 Tuple2<DenseVector, DenseMatrix> result = variationalTopicInference(wordCounts, expELogBeta, alpha, gammaShape, k);
 
                 assert result != null;
-                LDAUtils.sum(stats, result.f1);
+                stats = LDAUtils.sum(stats, result.f1);
 
                 gamma.put(doc.f1.f0, result.f0);
             }
