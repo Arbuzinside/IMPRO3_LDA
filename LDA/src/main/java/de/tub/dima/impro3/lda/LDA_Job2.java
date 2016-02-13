@@ -37,17 +37,17 @@ public class LDA_Job2 {
         String path = args[0];
         DataSet<String> rawLines = env.readTextFile(path);
 
-        DataSet<Tuple2<Long, DenseVector>> corpus = env.fromCollection( rawLines.map(new DataParser()).collect());
-
-        /**
-         * Default parameters:
-         *
-         *  S 1 4 16 64 256 1024 4096 16384     - mini batch size
-            κ 0.9 0.9 0.8 0.7 0.6 0.5 0.5 0.5   - learning rate
-            τ0 1024 1024 1024 1024 1024 1024 64 1 - early iterations
-         *
-         *
-         */
+        DataSet<Tuple2<Long, DenseVector>> corpus = rawLines.map(new DataParser());
+ 
+//        /**
+//         * Default parameters:
+//         *
+//         *  S 1 4 16 64 256 1024 4096 16384     - mini batch size
+//            κ 0.9 0.9 0.8 0.7 0.6 0.5 0.5 0.5   - learning rate
+//            τ0 1024 1024 1024 1024 1024 1024 64 1 - early iterations
+//         *
+//         *
+//         */
 //
 //        int numberOfTopics = Integer.parseInt(args[2]);
 //
@@ -80,7 +80,7 @@ public class LDA_Job2 {
 //	    DataSet<Tuple3<Integer, Integer, Double>> ds = env.fromCollection(list);
 //	    ds.writeAsText( args[1]);
 	 
-//       env.execute();
+       env.execute("LDA Test");
     }
 
 
