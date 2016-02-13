@@ -32,7 +32,7 @@ public class OnlineLDAOptimizer {
 
 
     public final static double MEAN_CHANGE_THRESHOLD = 1e-3;
-    public final static int NUM_ITERATIONS = 100;
+    public final static int NUM_ITERATIONS = 20;
 
     private static Random randomGenerator;
 
@@ -74,7 +74,7 @@ public class OnlineLDAOptimizer {
      *
      * Default: 0.05, i.e., 5% of total documents.
      */
-    private double miniBatchFraction = 0.05;
+    private double miniBatchFraction = 0.15;
     private int batchCount;
     //document concentration
     private  double alpha;
@@ -453,20 +453,6 @@ public class OnlineLDAOptimizer {
 
     }
 
-    public static class batchIndex implements MapFunction<Tuple2<Long, DenseVector>, Tuple2<Long, Tuple2<Long,DenseVector>>> {
-
-        private Long id;
-
-        public batchIndex() {
-            this.id = (long) -1;
-        }
-
-        @Override
-        public Tuple2<Long,Tuple2<Long, DenseVector>> map(Tuple2<Long, DenseVector> batchDoc){
-            id++;
-            return new Tuple2<>(id, batchDoc);
-        }
-    }
 
     public static Tuple2<DenseVector, DenseMatrix> variationalTopicInference(DenseVector termCounts, DenseMatrix expELogBeta, double alpha,
                                                                              double gammaShape, Integer K){
@@ -508,8 +494,9 @@ public class OnlineLDAOptimizer {
 
             // Iterate between gamma and phi until convergence
 
+            int iterations = 0;
 
-            while(true) {
+            while(iterations < NUM_ITERATIONS) {
 
                 lastGamma = gammaD.copy();
 
@@ -527,6 +514,8 @@ public class OnlineLDAOptimizer {
 
                 if (LDAUtils.closeTo(gammaD, lastGamma, MEAN_CHANGE_THRESHOLD))
                     break;
+
+                iterations++;
             }
 
 
