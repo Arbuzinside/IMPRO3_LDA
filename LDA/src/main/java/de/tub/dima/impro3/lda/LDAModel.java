@@ -17,7 +17,14 @@ public class LDAModel {
     private long vocabSize;
 
 
-
+    /**
+     * class of LDA model to store the topic matrix, the same as in Spark
+     * @param topics
+     * @param docConcentration
+     * @param topicConcentration
+     * @param gammaShape
+     * @param vocabSize
+     */
 
     public LDAModel(DenseMatrix topics, double docConcentration, double topicConcentration, double gammaShape, long vocabSize) {
         this.setTopics(topics);
